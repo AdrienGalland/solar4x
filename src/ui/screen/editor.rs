@@ -44,7 +44,7 @@ pub fn plugin(app: &mut App) {
                 .run_if(resource_exists::<EditorContext>),
         )
         .add_systems(OnEnter(InEditor), create_screen)
-        .add_systems(Update, update_editor_context.run_if(in_state(InEditor)).run_if(resource_exists::<EditorContext>()))
+        .add_systems(Update, update_editor_context.run_if(in_state(InEditor)).run_if(resource_exists::<EditorContext>))
         .add_systems(OnExit(InEditor), clear_screen);
 }
 
@@ -102,6 +102,13 @@ impl EditorContext {
             speed,
             simtick: tick,
             current_simtick: time.simtick,
+            game_time: time.time(),
+            time_running: toggle_time.0,
+            list_state: ListState::default(),
+            nodes: BTreeMap::new(),
+            predictions: Vec::new(),
+            temp_predictions: Vec::new(),
+            editing_data: None,
         }
     }
 

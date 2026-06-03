@@ -17,7 +17,6 @@ use crate::objects::{
 use super::id::MAX_ID_LENGTH;
 use super::prelude::{BodiesMapping, BodyInfo, PrimaryBody};
 use super::ObjectsUpdate;
-use scheduler::{ShipSchedule};
 
 pub mod trajectory;
 pub mod scheduler;
