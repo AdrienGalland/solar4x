@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy_ratatui::event::KeyEvent;
 use crossterm::event::KeyEventKind;
 use ratatui::{
-    layout::{Constraint, Flex, Layout},
+    layout::{Alignment, Constraint, Flex, Layout},
     text::Line,
     widgets::{List, ListState, Paragraph, StatefulWidget, Widget},
 };
@@ -142,6 +142,9 @@ impl StatefulWidget for StartMenu {
         .flex(Flex::Center)
         .split(area);
         Paragraph::new(title).centered().render(chunks[0], buf);
+        Paragraph::new("Start menu — Up/Down: move  ·  Space: select  ·  Esc: quit")
+            .alignment(Alignment::Center)
+            .render(chunks[1], buf);
         let (_, entries): (Vec<_>, Vec<&str>) = SCREENS.into_iter().unzip();
         let list_width = entries.iter().map(|s| s.len()).max().unwrap();
         let entries = entries.into_iter().map(|s| Line::from(s).centered());

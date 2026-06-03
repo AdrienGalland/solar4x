@@ -43,6 +43,8 @@ pub struct FleetScreenKeymap {
     pub validate_new_ship: Key,
     pub delete_char: Key,
     pub enter_explorer: Key,
+    pub run_time: Key,
+    pub pause_time: Key,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -52,6 +54,8 @@ pub struct EditorKeymap {
     pub back: Key,
     pub new_node: Key,
     pub open_scheduler: Key,
+    pub run_time: Key,
+    pub pause_time: Key,
 }
 
 impl Keymap {
@@ -172,6 +176,8 @@ impl Default for FleetScreenKeymap {
             validate_new_ship: Key::from_str_unchecked("enter"),
             delete_char: Key::from_str_unchecked("backspace"),
             enter_explorer: Key::from_str_unchecked("e"),
+            run_time: Key::from_str_unchecked("r"),
+            pause_time: Key::from_str_unchecked("p"),
         }
     }
 }
@@ -184,6 +190,8 @@ impl Default for EditorKeymap {
             back: Key::from_str_unchecked("esc"),
             new_node: Key::from_str_unchecked("n"),
             open_scheduler: Key::from_str_unchecked("s"),
+            run_time: Key::from_str_unchecked("r"),
+            pause_time: Key::from_str_unchecked("p"),
         }
     }
 }

@@ -4,7 +4,7 @@ use bevy::{math::DVec3, prelude::*};
 use bevy_ratatui::event::KeyEvent;
 use crossterm::event::KeyEventKind;
 use ratatui::{
-    layout::{Constraint, Layout},
+    layout::{Alignment, Constraint, Layout},
     widgets::{Block, List, ListState, Paragraph, StatefulWidget, Widget},
 };
 
@@ -17,7 +17,7 @@ use crate::{
     physics::
     {
         // influence::HillRadius, leapfrog::get_acceleration,
-        time::SIMTICKS_PER_TICK}, 
+        time::{SIMTICKS_PER_TICK, TimeEvent}}, 
     prelude::*,
 };
 
@@ -44,6 +44,7 @@ pub fn plugin(app: &mut App) {
                 .run_if(resource_exists::<EditorContext>),
         )
         .add_systems(OnEnter(InEditor), create_screen)
+        .add_systems(Update, update_editor_context.run_if(in_state(InEditor)).run_if(resource_exists::<EditorContext>()))
         .add_systems(OnExit(InEditor), clear_screen);
 }
 
@@ -68,6 +69,9 @@ pub struct EditorContext {
     pub pos: DVec3,
     pub speed: DVec3,
     pub simtick: u64,
+    pub current_simtick: u64,
+    pub game_time: f64,
+    pub time_running: bool,
     list_state: ListState,
     /// Each maneuver node is stored here along with the associated tick, and corresponds to a prediction.
     /// Since there is a prediction for each tick, the index of the prediction is simply the number of ticks
@@ -88,6 +92,8 @@ impl EditorContext {
         &Position(pos): &Position,
         &Velocity(speed): &Velocity,
         tick: u64,
+        time: &GameTime,
+        toggle_time: &ToggleTime,
     ) -> Self {
         Self {
             ship,
@@ -95,11 +101,7 @@ impl EditorContext {
             pos,
             speed,
             simtick: tick,
-            list_state: ListState::default(),
-            nodes: BTreeMap::new(),
-            predictions: Vec::new(),
-            temp_predictions: Vec::new(),
-            editing_data: None,
+            current_simtick: time.simtick,
         }
     }
 
@@ -194,6 +196,7 @@ fn create_screen(
     // host_bodies: Query<(&HostBody, &Position)>,
     // primary_body: Query<&BodyInfo, With<PrimaryBody>>,
     time: Res<GameTime>,
+    toggle_time: Res<ToggleTime>,
 ) {
     // let main_body = primary_body.get_single().unwrap().0.id;
     if let AppScreen::Editor(id) = screen.get() {
@@ -232,6 +235,8 @@ fn create_screen(
                 pos,
                 speed,
                 time.simtick,
+                &time,
+                &toggle_time,
             ));
             let mut map = SpaceMap::new(system_size.0, host_body, host_body);
             map.autoscale(&bodies_mapping.0, &bodies);
@@ -259,6 +264,7 @@ fn read_input(
     mut key_event: EventReader<KeyEvent>,
     keymap: Res<Keymap>,
     mut internal_event: EventWriter<EditorEvents>,
+    mut time_event_writer: EventWriter<TimeEvent>,
     mut next_screen: ResMut<NextState<AppScreen>>,
 ) {
     use Direction2::*;
@@ -268,7 +274,11 @@ fn read_input(
         if event.kind == KeyEventKind::Release {
             return;
         }
-        if keymap.select_next.matches(event) {
+        if keymap.run_time.matches(event) {
+            time_event_writer.send(TimeEvent::StartTime);
+        } else if keymap.pause_time.matches(event) {
+            time_event_writer.send(TimeEvent::PauseTime);
+        } else if keymap.select_next.matches(event) {
             internal_event.send(SelectAdjacent(Down));
         } else if keymap.select_previous.matches(event) {
             internal_event.send(SelectAdjacent(Up));
@@ -285,6 +295,16 @@ pub enum EditorEvents {
     SelectAdjacent(Direction2),
     SelectNearestOrInsert(u64),
     CreateSchedule(ShipID),
+}
+
+fn update_editor_context(
+    time: Res<GameTime>,
+    toggle_time: Res<ToggleTime>,
+    mut context: ResMut<EditorContext>,
+) {
+    context.game_time = time.time();
+    context.time_running = toggle_time.0;
+    context.current_simtick = time.simtick;
 }
 
 fn handle_editor_events(
@@ -336,19 +356,35 @@ impl StatefulWidget for EditorScreen {
         buf: &mut ratatui::prelude::Buffer,
         state: &mut Self::State,
     ) {
-        let chunks =
-            Layout::horizontal([Constraint::Percentage(30), Constraint::Fill(1)]).split(area);
+        let outer_chunks = Layout::vertical([Constraint::Length(2), Constraint::Min(1)]).split(area);
+        Paragraph::new("Trajectory editor — n: new node  ·  s: scheduler  ·  r: run  ·  p: pause  ·  Esc: back")
+            .alignment(Alignment::Center)
+            .render(outer_chunks[0], buf);
+
+        let chunks = Layout::horizontal([Constraint::Percentage(30), Constraint::Fill(1)])
+            .split(outer_chunks[1]);
         let list = List::new(state.nodes.values().map(|n| &n.name[..]))
             .highlight_symbol(">")
-            .block(Block::bordered().title_top("Maneuver nodes"));
+            .block(Block::bordered().title_top(format!(
+                "Maneuver nodes — {:.3} d ({})",
+                state.game_time,
+                if state.time_running { "Running" } else { "Paused" }
+            )));
         StatefulWidget::render(list, chunks[0], buf, &mut state.list_state);
 
         if let Some((tick, node)) = state.selected_entry() {
             Paragraph::new(format!(
-                "Tick: {}\nThrust: {}\nOrigin: {}",
-                tick, node.thrust, node.origin
+                "Tick: {}\nTime: {:.3} d\nStatus: {}\nThrust: {}\nOrigin: {}\n\nKeys: Up/Down move  ·  n new node  ·  s scheduler  ·  r run  ·  p pause  ·  Esc back",
+                tick,
+                state.game_time,
+                if state.time_running { "Running" } else { "Paused" },
+                node.thrust,
+                node.origin
             ))
             .render(chunks[1], buf);
+        } else {
+            Paragraph::new("No node selected. Use n to create a new node or select one in the list.")
+                .render(chunks[1], buf);
         }
     }
 }

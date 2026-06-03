@@ -12,6 +12,7 @@ use ratatui::{
 
 use crate::{
     objects::id::MAX_ID_LENGTH,
+    physics::time::TimeEvent,
     prelude::*,
     ui::UiUpdate,
     utils::{algebra::circular_orbit_around_body, list::OptionsList, ui::centered_rect},
@@ -64,6 +65,8 @@ pub struct FleetContext {
     ships: Vec<ShipInfo>,
     popup_context: Option<CreateShipContext>,
     stage: GameStage,
+    game_time: f64,
+    time_running: bool,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -230,6 +233,7 @@ fn read_input(
     mut key_event: EventReader<KeyEvent>,
     keymap: Res<Keymap>,
     mut internal_event: EventWriter<FleetScreenEvent>,
+    mut time_events: EventWriter<TimeEvent>,
 ) {
     use Direction2::*;
     use FleetScreenEvent::*;
@@ -248,6 +252,12 @@ fn read_input(
                 }
                 e if keymap.edit_trajectory.matches(e) => {
                     internal_event.send(EditTrajectory);
+                }
+                e if keymap.run_time.matches(e) => {
+                    time_events.send(TimeEvent::StartTime);
+                }
+                e if keymap.pause_time.matches(e) => {
+                    time_events.send(TimeEvent::PauseTime);
                 }
                 e if keymap.new_ship.matches(e) => {
                     context.popup_context = Some(CreateShipContext::default())
@@ -313,9 +323,13 @@ fn handle_fleet_events(
 fn update_fleet_context(
     stage: Res<State<GameStage>>,
     ships: Query<&ShipInfo>,
+    time: Res<GameTime>,
+    toggle_time: Res<ToggleTime>,
     mut ctx: ResMut<FleetContext>,
 ) {
     ctx.stage = stage.get().clone();
+    ctx.game_time = time.time();
+    ctx.time_running = toggle_time.0;
     ctx.ships.retain(|i| ships.iter().any(|j| i == j));
     let diff = ships
         .iter()
@@ -340,18 +354,31 @@ impl StatefulWidget for FleetScreen {
         let entries = state.ships.iter().map(|s| s.id.to_string());
         let list = List::new(entries).highlight_symbol(">").block(
             Block::bordered()
-                .title_top("Ships")
-                .title_bottom(format!("Current stage: {}", state.stage)),
+                .title_top(format!(
+                    "Fleet — Stage: {}  ·  Time: {:.3} d ({})",
+                    state.stage,
+                    state.game_time,
+                    if state.time_running { "Running" } else { "Paused" }
+                ))
+                .title_bottom("Ships"),
         );
         <List as StatefulWidget>::render(list, chunks[0], buf, &mut state.list_state);
 
-        // Ship info
+        // Ship info or help panel
         if let Some(info) = state.selected_ship() {
             Paragraph::new(format!(
-                "ID: {}\nSpawn position: {}\nSpawn velocity: {}",
-                info.id, info.spawn_pos, info.spawn_speed
+                "ID: {}\nSpawn position: {}\nSpawn velocity: {}\n\nControls: space edit traj, n new ship, e explorer, r run, p pause, esc back",
+                info.id,
+                info.spawn_pos,
+                info.spawn_speed
             ))
             .block(Block::bordered().title_top("Ship info"))
+            .render(chunks[1], buf);
+        } else {
+            Paragraph::new(
+                "No ship selected. Use Up/Down to choose a ship.\n\nControls: space edit traj, n new ship, e explorer, r run, p pause, esc back",
+            )
+            .block(Block::bordered().title_top("Fleet help"))
             .render(chunks[1], buf);
         }
 
@@ -359,16 +386,22 @@ impl StatefulWidget for FleetScreen {
         if let Some(ctx) = &mut state.popup_context {
             let popup = centered_rect(60, 60, area);
             Clear.render(popup, buf);
-            let chunks =
-                Layout::vertical([Constraint::Length(3), Constraint::Fill(1)]).split(popup);
+            let chunks = Layout::vertical(
+                [Constraint::Length(2), Constraint::Length(1), Constraint::Fill(1)],
+            )
+            .split(popup);
 
             // Title
-            Paragraph::new("Create ship".bold())
+            Paragraph::new("Ship creation".bold())
                 .alignment(Alignment::Center)
                 .render(chunks[0], buf);
 
+            Paragraph::new("Esc: cancel  ·  Tab: next field  ·  Shift+Tab: previous  ·  Enter: validate")
+                .alignment(Alignment::Center)
+                .render(chunks[1], buf);
+
             let body = Layout::horizontal([Constraint::Percentage(50), Constraint::Fill(1)])
-                .split(chunks[1]);
+                .split(chunks[2]);
 
             // Left side of options
             let mut constraints = [Constraint::Percentage(100 / 3)].repeat(3);

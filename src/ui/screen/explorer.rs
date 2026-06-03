@@ -363,11 +363,16 @@ impl StatefulWidget for ExplorerScreen<'_> {
         buf: &mut ratatui::prelude::Buffer,
         state: &mut Self::State,
     ) {
+        let outer_chunks = Layout::vertical([Constraint::Length(2), Constraint::Min(1)]).split(area);
+        Paragraph::new("Explorer — /: search  ·  i: toggle info  ·  f: focus  ·  t: toggle time  ·  >/<: speed  ·  Esc: back")
+            .alignment(Alignment::Center)
+            .render(outer_chunks[0], buf);
+
         let mut c = vec![Constraint::Percentage(25), Constraint::Fill(1)];
         if state.info_toggle {
             c.push(Constraint::Percentage(25));
         }
-        let chunks = Layout::horizontal(c).split(area);
+        let chunks = Layout::horizontal(c).split(outer_chunks[1]);
 
         match state.side_pane_mode {
             SidePaneMode::Tree => TreeWidget.render(chunks[0], buf, &mut state.tree_state),
