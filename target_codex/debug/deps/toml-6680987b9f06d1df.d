@@ -1,0 +1,13 @@
+C:\Users\Julien\Documents\Stages\Stage rust\Code_github\solar4x\target_codex\debug\deps\toml-6680987b9f06d1df.d: C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.15\src\lib.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.15\src\map.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.15\src\value.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.15\src\de.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.15\src\ser.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.15\src\macros.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.15\src\edit.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.15\src\fmt.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.15\src\table.rs
+
+C:\Users\Julien\Documents\Stages\Stage rust\Code_github\solar4x\target_codex\debug\deps\libtoml-6680987b9f06d1df.rmeta: C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.15\src\lib.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.15\src\map.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.15\src\value.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.15\src\de.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.15\src\ser.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.15\src\macros.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.15\src\edit.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.15\src\fmt.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.15\src\table.rs
+
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.15\src\lib.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.15\src\map.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.15\src\value.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.15\src\de.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.15\src\ser.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.15\src\macros.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.15\src\edit.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.15\src\fmt.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\toml-0.8.15\src\table.rs:

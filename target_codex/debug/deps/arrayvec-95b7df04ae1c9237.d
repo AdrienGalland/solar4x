@@ -1,0 +1,11 @@
+C:\Users\Julien\Documents\Stages\Stage rust\Code_github\solar4x\target_codex\debug\deps\arrayvec-95b7df04ae1c9237.d: C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\arrayvec-0.7.4\src\lib.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\arrayvec-0.7.4\src\arrayvec_impl.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\arrayvec-0.7.4\src\arrayvec.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\arrayvec-0.7.4\src\array_string.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\arrayvec-0.7.4\src\char.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\arrayvec-0.7.4\src\errors.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\arrayvec-0.7.4\src\utils.rs
+
+C:\Users\Julien\Documents\Stages\Stage rust\Code_github\solar4x\target_codex\debug\deps\libarrayvec-95b7df04ae1c9237.rmeta: C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\arrayvec-0.7.4\src\lib.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\arrayvec-0.7.4\src\arrayvec_impl.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\arrayvec-0.7.4\src\arrayvec.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\arrayvec-0.7.4\src\array_string.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\arrayvec-0.7.4\src\char.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\arrayvec-0.7.4\src\errors.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\arrayvec-0.7.4\src\utils.rs
+
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\arrayvec-0.7.4\src\lib.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\arrayvec-0.7.4\src\arrayvec_impl.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\arrayvec-0.7.4\src\arrayvec.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\arrayvec-0.7.4\src\array_string.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\arrayvec-0.7.4\src\char.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\arrayvec-0.7.4\src\errors.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\arrayvec-0.7.4\src\utils.rs:

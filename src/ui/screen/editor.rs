@@ -17,7 +17,7 @@ use crate::{
     physics::
     {
         // influence::HillRadius, leapfrog::get_acceleration,
-        time::{SIMTICKS_PER_TICK, TimeEvent}}, 
+        time::{SIMTICKS_PER_TICK, TimeEvent}},
     prelude::*,
 };
 
@@ -146,7 +146,7 @@ impl EditorContext {
     }
 
     fn index_of_prediction_at_simtick(&self, simtick: u64) -> usize {
-        (simtick - self.simtick).max(self.simtick) as usize
+        simtick.saturating_sub(self.simtick) as usize
     }
 
     fn prediction_at_simtick(&self, tick: u64) -> Option<Entity> {
@@ -203,7 +203,7 @@ fn create_screen(
     // host_bodies: Query<(&HostBody, &Position)>,
     // primary_body: Query<&BodyInfo, With<PrimaryBody>>,
     time: Res<GameTime>,
-    toggle_time: Res<ToggleTime>,
+    mut toggle_time: ResMut<ToggleTime>,
 ) {
     // let main_body = primary_body.get_single().unwrap().0.id;
     if let AppScreen::Editor(id) = screen.get() {
@@ -236,6 +236,7 @@ fn create_screen(
                 speed,
             ) = ships.get(*e).unwrap();
 
+            toggle_time.0 = false;
             commands.insert_resource(EditorContext::new(
                 *e,
                 info.clone(),
@@ -307,8 +308,18 @@ pub enum EditorEvents {
 fn update_editor_context(
     time: Res<GameTime>,
     toggle_time: Res<ToggleTime>,
+    ships: Query<(&Position, &Velocity), With<ShipInfo>>,
     mut context: ResMut<EditorContext>,
+    mut reload: EventWriter<editor_backend::ReloadPredictions>,
 ) {
+    if context.current_simtick != time.simtick {
+        if let Ok((&Position(pos), &Velocity(speed))) = ships.get(context.ship) {
+            context.pos = pos;
+            context.speed = speed;
+            context.simtick = time.simtick;p
+            reload.send_default();
+        }
+    }
     context.game_time = time.time();
     context.time_running = toggle_time.0;
     context.current_simtick = time.simtick;

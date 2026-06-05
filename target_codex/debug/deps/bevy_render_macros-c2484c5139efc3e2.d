@@ -1,0 +1,8 @@
+C:\Users\Julien\Documents\Stages\Stage rust\Code_github\solar4x\target_codex\debug\deps\bevy_render_macros-c2484c5139efc3e2.d: C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_render_macros-0.14.0\src\lib.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_render_macros-0.14.0\src\as_bind_group.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_render_macros-0.14.0\src\extract_component.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_render_macros-0.14.0\src\extract_resource.rs
+
+C:\Users\Julien\Documents\Stages\Stage rust\Code_github\solar4x\target_codex\debug\deps\bevy_render_macros-c2484c5139efc3e2.dll: C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_render_macros-0.14.0\src\lib.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_render_macros-0.14.0\src\as_bind_group.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_render_macros-0.14.0\src\extract_component.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_render_macros-0.14.0\src\extract_resource.rs
+
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_render_macros-0.14.0\src\lib.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_render_macros-0.14.0\src\as_bind_group.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_render_macros-0.14.0\src\extract_component.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_render_macros-0.14.0\src\extract_resource.rs:

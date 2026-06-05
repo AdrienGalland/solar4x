@@ -1,0 +1,9 @@
+C:\Users\Julien\Documents\Stages\Stage rust\Code_github\solar4x\target_codex\debug\deps\bevy_derive-a3b5c1689a3150bf.d: C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_derive-0.14.0\src\lib.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_derive-0.14.0\src\app_plugin.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_derive-0.14.0\src\bevy_main.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_derive-0.14.0\src\derefs.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_derive-0.14.0\src\enum_variant_meta.rs
+
+C:\Users\Julien\Documents\Stages\Stage rust\Code_github\solar4x\target_codex\debug\deps\bevy_derive-a3b5c1689a3150bf.dll: C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_derive-0.14.0\src\lib.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_derive-0.14.0\src\app_plugin.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_derive-0.14.0\src\bevy_main.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_derive-0.14.0\src\derefs.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_derive-0.14.0\src\enum_variant_meta.rs
+
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_derive-0.14.0\src\lib.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_derive-0.14.0\src\app_plugin.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_derive-0.14.0\src\bevy_main.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_derive-0.14.0\src\derefs.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_derive-0.14.0\src\enum_variant_meta.rs:

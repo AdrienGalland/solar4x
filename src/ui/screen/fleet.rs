@@ -338,7 +338,7 @@ fn update_fleet_context(
     ctx.ships.extend(diff);
 }
 
-impl StatefulWidget for FleetScreen {
+ impl StatefulWidget for FleetScreen {
     type State = FleetContext;
 
     fn render(
