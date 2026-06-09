@@ -18,6 +18,7 @@ use crate::{
         influence::InfluenceUpdate, orbit::OrbitsUpdate, prelude::ToggleTime, PhysicsPlugin,
         PhysicsUpdate,
     },
+    scripting::ScriptingPlugin,
     ui::gui::GUIUpdate,
 };
 
@@ -54,7 +55,7 @@ impl Plugin for GamePlugin {
         } else {
             app.add_plugins(DefaultPlugins)
         }
-        .add_plugins((PhysicsPlugin, BodiesPlugin, ShipsPlugin))
+        .add_plugins((PhysicsPlugin, BodiesPlugin, ShipsPlugin, ScriptingPlugin))
         .add_computed_state::<InGame>()
         .add_computed_state::<Authoritative>()
         .add_sub_state::<GameStage>()
