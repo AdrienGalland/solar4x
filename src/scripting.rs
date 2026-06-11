@@ -1,3 +1,5 @@
+pub mod event_bus;
+
 use std::{
     cell::RefCell,
     fs,
@@ -26,12 +28,14 @@ pub struct ScriptingPlugin;
 
 impl Plugin for ScriptingPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<ScriptSettings>().add_systems(
-            FixedUpdate,
-            run_ship_scripts
-                .before(TrajectoryUpdate)
-                .run_if(in_state(Loaded)),
-        );
+        app.add_plugins(event_bus::EventBusPlugin)
+            .init_resource::<ScriptSettings>()
+            .add_systems(
+                FixedUpdate,
+                run_ship_scripts
+                    .before(TrajectoryUpdate)
+                    .run_if(in_state(Loaded)),
+            );
     }
 }
 
