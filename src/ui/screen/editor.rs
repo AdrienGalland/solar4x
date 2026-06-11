@@ -316,7 +316,7 @@ fn update_editor_context(
         if let Ok((&Position(pos), &Velocity(speed))) = ships.get(context.ship) {
             context.pos = pos;
             context.speed = speed;
-            context.simtick = time.simtick;p
+            context.simtick = time.simtick;
             reload.send_default();
         }
     }
