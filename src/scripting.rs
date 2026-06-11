@@ -8,11 +8,11 @@ use std::{
 use bevy::{math::DVec3, prelude::*};
 use mlua::{Lua, Table, Value};
 
-use crate::{
-    game::Loaded,
-    objects::{
-        prelude::{BodiesMapping, BodyID, BodyInfo},
-        ships::{
+    use crate::{
+        game::Loaded,
+        objects::{
+            prelude::{id_from, BodiesMapping, BodyID, BodyInfo},
+            ships::{
             trajectory::{TrajectoryUpdate, VelocityUpdate},
             ShipID, ShipInfo,
         },
@@ -148,7 +148,7 @@ fn install_ship_api(
     globals.set(
         "body",
         lua.create_function(move |lua, id: String| {
-            let id = BodyID::from(id.as_str()).map_err(mlua::Error::external)?;
+            let id = id_from(&id);
             let Some(_) = body_entities.get(&id) else {
                 return Ok(Value::Nil);
             };
