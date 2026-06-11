@@ -87,10 +87,10 @@ impl LuaEventBus {
     }
 
     /// Build a Lua table from key-value string pairs, useful for Rust-side `fire` calls.
-    pub fn make_table<'a>(
-        &'a self,
-        fields: &[(&str, Value<'a>)],
-    ) -> mlua::Result<Value<'a>> {
+    pub fn make_table(
+        &self,
+        fields: &[(&str, Value)],
+    ) -> mlua::Result<Value> {
         let table = self.lua.create_table()?;
         for (k, v) in fields {
             table.set(*k, v.clone())?;
@@ -139,7 +139,7 @@ fn process_lua_events(mut bus: NonSendMut<LuaEventBus>) {
 /// yielded again (i.e., called `wait_for`), or `None` if it finished.
 fn resume_thread(thread: &Thread, data: Value) -> Option<String> {
     match thread.resume::<Value>(data) {
-        Ok(Value::String(s)) => Some(s.to_str().unwrap_or_default().to_string()),
+        Ok(Value::String(s)) => s.to_str().ok().map(|b| b.to_string()),
         Ok(_) => None,
         Err(e) => {
             warn!("Lua coroutine error: {e}");
