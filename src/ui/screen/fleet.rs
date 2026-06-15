@@ -7,7 +7,7 @@ use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::{
     layout::{Alignment, Constraint, Layout},
     style::Stylize,
-    widgets::{Block, Clear, List, ListState, Paragraph, StatefulWidget, Widget},
+    widgets::{Block, Clear, List, ListState, Paragraph, StatefulWidget, Widget, Wrap},
 };
 
 use crate::{
@@ -15,7 +15,7 @@ use crate::{
     physics::time::TimeEvent,
     prelude::*,
     ui::UiUpdate,
-    utils::{algebra::circular_orbit_around_body, list::OptionsList, ui::centered_rect},
+    utils::{algebra::circular_orbit_around_body, list::OptionsList},
 };
 
 pub fn plugin(app: &mut App) {
@@ -221,12 +221,18 @@ impl FleetContext {
             ..Default::default()
         }
     }
+    pub fn has_popup(&self) -> bool {
+        self.popup_context.is_some()
+    }
     fn selected_ship(&self) -> Option<&ShipInfo> {
         self.list_state.selected().map(|i| &self.ships[i])
     }
 }
 
 pub struct FleetScreen;
+
+/// Renders only the popup, centered on the full window area.
+pub struct FleetPopup;
 
 fn read_input(
     mut context: ResMut<FleetContext>,
@@ -338,15 +344,23 @@ fn update_fleet_context(
     ctx.ships.extend(diff);
 }
 
- impl StatefulWidget for FleetScreen {
+impl StatefulWidget for FleetScreen {
     type State = FleetContext;
 
     fn render(
         self,
-        area: ratatui::prelude::Rect,
+        _full_area: ratatui::prelude::Rect,
         buf: &mut ratatui::prelude::Buffer,
         state: &mut Self::State,
     ) {
+        use crate::ui::tui_overlay::{TUI_COLS, TUI_ROWS};
+        let area = ratatui::prelude::Rect {
+            x: 0,
+            y: 0,
+            width: TUI_COLS,
+            height: TUI_ROWS,
+        };
+
         let chunks =
             Layout::horizontal([Constraint::Percentage(50), Constraint::Fill(1)]).split(area);
 
@@ -373,51 +387,71 @@ fn update_fleet_context(
                 info.spawn_speed
             ))
             .block(Block::bordered().title_top("Ship info"))
+            .wrap(Wrap { trim: true })
             .render(chunks[1], buf);
         } else {
             Paragraph::new(
                 "No ship selected. Use Up/Down to choose a ship.\n\nControls: space edit traj, n new ship, e explorer, r run, p pause, esc back",
             )
             .block(Block::bordered().title_top("Fleet help"))
+            .wrap(Wrap { trim: true })
             .render(chunks[1], buf);
         }
+    }
+}
 
-        // Ship creation popup
-        if let Some(ctx) = &mut state.popup_context {
-            let popup = centered_rect(60, 60, area);
-            Clear.render(popup, buf);
-            let chunks = Layout::vertical(
-                [Constraint::Length(2), Constraint::Length(1), Constraint::Fill(1)],
-            )
-            .split(popup);
+impl StatefulWidget for FleetPopup {
+    type State = FleetContext;
 
-            // Title
-            Paragraph::new("Ship creation".bold())
-                .alignment(Alignment::Center)
-                .render(chunks[0], buf);
+    fn render(
+        self,
+        area: ratatui::prelude::Rect,
+        buf: &mut ratatui::prelude::Buffer,
+        state: &mut Self::State,
+    ) {
+        let Some(ctx) = &mut state.popup_context else {
+            return;
+        };
 
-            Paragraph::new("Esc: cancel  ·  Tab: next field  ·  Shift+Tab: previous  ·  Enter: validate")
-                .alignment(Alignment::Center)
-                .render(chunks[1], buf);
+        // The popup is rendered into a dedicated buffer (POPUP_COLS × POPUP_ROWS).
+        // Centering on screen is handled by the Bevy UI overlay — no centered_rect needed.
+        Clear.render(area, buf);
+        let block = Block::bordered().title_top(" Ship creation ".bold());
+        let inner = block.inner(area);
+        block.render(area, buf);
 
-            let body = Layout::horizontal([Constraint::Percentage(50), Constraint::Fill(1)])
-                .split(chunks[2]);
+        let chunks = Layout::vertical([
+            Constraint::Length(1),
+            Constraint::Length(2),
+            Constraint::Fill(1),
+        ])
+        .split(inner);
 
-            // Left side of options
-            let mut constraints = [Constraint::Percentage(100 / 3)].repeat(3);
-            constraints.push(Constraint::Fill(1));
-            let left = Layout::vertical(constraints).split(body[0]);
-            for i in 0..3 {
-                ctx.paragraph(i).render(left[i], buf);
-            }
+        Paragraph::new("Esc: cancel  ·  Tab: next field  ·  Shift+Tab: prev  ·  Enter: validate")
+            .alignment(Alignment::Center)
+            .wrap(Wrap { trim: true })
+            .render(chunks[0], buf);
 
-            // Right side (spawn coordinates)
-            let mut constraints = [Constraint::Percentage(100 / 6)].repeat(6);
-            constraints.push(Constraint::Fill(1));
-            let coords = Layout::vertical(constraints).split(body[1]);
-            for i in 3..9 {
-                ctx.paragraph(i).render(coords[i - 3], buf);
-            }
+        Paragraph::new("Fill host body + altitude for orbit, or all six coords for free spawn.")
+            .alignment(Alignment::Center)
+            .wrap(Wrap { trim: true })
+            .render(chunks[1], buf);
+
+        let body =
+            Layout::horizontal([Constraint::Percentage(50), Constraint::Fill(1)]).split(chunks[2]);
+
+        let mut lc = [Constraint::Percentage(100 / 3)].repeat(3);
+        lc.push(Constraint::Fill(1));
+        let left = Layout::vertical(lc).split(body[0]);
+        for i in 0..3 {
+            ctx.paragraph(i).render(left[i], buf);
+        }
+
+        let mut rc = [Constraint::Percentage(100 / 6)].repeat(6);
+        rc.push(Constraint::Fill(1));
+        let coords = Layout::vertical(rc).split(body[1]);
+        for i in 3..9 {
+            ctx.paragraph(i).render(coords[i - 3], buf);
         }
     }
 }

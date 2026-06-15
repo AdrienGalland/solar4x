@@ -3,7 +3,7 @@ use bevy_ratatui::event::KeyEvent;
 use crossterm::event::{KeyCode, KeyEvent as CKeyEvent, KeyEventKind};
 use ratatui::{
     layout::{Constraint, Layout},
-    widgets::{Paragraph, StatefulWidget, StatefulWidgetRef, Widget, WidgetRef},
+    widgets::{Paragraph, StatefulWidget, StatefulWidgetRef, Widget, WidgetRef, Wrap},
 };
 
 use crate::{
@@ -359,13 +359,16 @@ impl StatefulWidget for ExplorerScreen<'_> {
 
     fn render(
         self,
-        area: ratatui::prelude::Rect,
+        _full_area: ratatui::prelude::Rect,
         buf: &mut ratatui::prelude::Buffer,
         state: &mut Self::State,
     ) {
+        use crate::ui::tui_overlay::{TUI_COLS, TUI_ROWS};
+        let area = ratatui::prelude::Rect { x: 0, y: 0, width: TUI_COLS, height: TUI_ROWS };
         let outer_chunks = Layout::vertical([Constraint::Length(2), Constraint::Min(1)]).split(area);
         Paragraph::new("Explorer — /: search  ·  i: toggle info  ·  f: focus  ·  t: toggle time  ·  >/<: speed  ·  Esc: back")
             .alignment(ratatui::layout::Alignment::Center)
+            .wrap(Wrap { trim: true })
             .render(outer_chunks[0], buf);
 
         let mut c = vec![Constraint::Percentage(25), Constraint::Fill(1)];

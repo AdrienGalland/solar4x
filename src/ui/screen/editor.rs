@@ -5,7 +5,7 @@ use bevy_ratatui::event::KeyEvent;
 use crossterm::event::KeyEventKind;
 use ratatui::{
     layout::{Alignment, Constraint, Layout},
-    widgets::{Block, List, ListState, Paragraph, StatefulWidget, Widget},
+    widgets::{Block, List, ListState, Paragraph, StatefulWidget, Widget, Wrap},
 };
 
 use crate::{
@@ -370,13 +370,16 @@ impl StatefulWidget for EditorScreen {
 
     fn render(
         self,
-        area: ratatui::prelude::Rect,
+        _full_area: ratatui::prelude::Rect,
         buf: &mut ratatui::prelude::Buffer,
         state: &mut Self::State,
     ) {
+        use crate::ui::tui_overlay::{TUI_COLS, TUI_ROWS};
+        let area = ratatui::prelude::Rect { x: 0, y: 0, width: TUI_COLS, height: TUI_ROWS };
         let outer_chunks = Layout::vertical([Constraint::Length(2), Constraint::Min(1)]).split(area);
         Paragraph::new("Trajectory editor — n: new node  ·  s: scheduler  ·  r: run  ·  p: pause  ·  Esc: back")
             .alignment(Alignment::Center)
+            .wrap(Wrap { trim: true })
             .render(outer_chunks[0], buf);
 
         let chunks = Layout::horizontal([Constraint::Percentage(30), Constraint::Fill(1)])
@@ -399,9 +402,11 @@ impl StatefulWidget for EditorScreen {
                 node.thrust,
                 node.origin
             ))
+            .wrap(Wrap { trim: true })
             .render(chunks[1], buf);
         } else {
             Paragraph::new("No node selected. Use n to create a new node or select one in the list.")
+                .wrap(Wrap { trim: true })
                 .render(chunks[1], buf);
         }
     }

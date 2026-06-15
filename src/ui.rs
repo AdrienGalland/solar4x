@@ -1,16 +1,19 @@
 use bevy::prelude::*;
-use bevy_ratatui::{event::KeyEvent, RatatuiPlugins};
+use bevy_ratatui::event::KeyEvent;
 
 use crate::input::prelude::Keymap;
 
 pub mod gui;
 pub mod screen;
+pub mod tui_input;
+pub mod tui_overlay;
 pub mod widget;
 
 pub mod prelude {
     pub use super::{
         gui::{SelectObjectEvent, MAX_HEIGHT},
         screen::{in_loaded_screen, AppScreen},
+        tui_overlay::TuiContext,
         widget::space_map::SpaceMap,
         EventHandling, InputReading, TuiPlugin,
     };
@@ -33,16 +36,37 @@ impl TuiPlugin {
 
 impl Plugin for TuiPlugin {
     fn build(&self, app: &mut App) {
-        if self.headless {
-            app.add_event::<KeyEvent>();
-        } else {
-            app.add_plugins(RatatuiPlugins::default());
-        }
-        app.add_plugins(screen::plugin)
+        app.add_event::<KeyEvent>()
+            .add_plugins(screen::plugin)
             .insert_resource(self.keymap.clone())
             .configure_sets(PostUpdate, (UiUpdate, RenderSet).chain())
             .configure_sets(Update, (InputReading, EventHandling).chain());
+
+        if !self.headless {
+            app.add_plugins(tui_overlay::plugin).add_systems(
+                PreUpdate,
+                tui_input::bevy_keyboard_to_key_event,
+            );
+
+            // Initialize TuiContext once the window is available.
+            app.add_systems(Startup, init_tui_context);
+        }
     }
+}
+
+fn init_tui_context(mut commands: Commands, windows: Query<&Window, With<bevy::window::PrimaryWindow>>) {
+    let (cols, rows) = windows
+        .get_single()
+        .map(|w| {
+            let font_w = tui_overlay::FONT_SIZE * 0.6;
+            let font_h = tui_overlay::FONT_SIZE * 1.2;
+            (
+                (w.width() / font_w).floor() as u16,
+                (w.height() / font_h).floor() as u16,
+            )
+        })
+        .unwrap_or((180, 50));
+    commands.insert_resource(tui_overlay::TuiContext::new(cols, rows));
 }
 
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]

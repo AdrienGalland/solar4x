@@ -122,10 +122,12 @@ impl StatefulWidget for StartMenu {
 
     fn render(
         self,
-        area: ratatui::prelude::Rect,
+        _full_area: ratatui::prelude::Rect,
         buf: &mut ratatui::prelude::Buffer,
         state: &mut Self::State,
     ) {
+        use crate::ui::tui_overlay::{TUI_COLS, TUI_ROWS};
+        let area = ratatui::prelude::Rect { x: 0, y: 0, width: TUI_COLS, height: TUI_ROWS };
         let title = r#"
  _______  _____         _______  ______           _     _
  |______ |     | |      |_____| |_____/  /_____|   \___/ 

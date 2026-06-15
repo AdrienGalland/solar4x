@@ -126,7 +126,11 @@ System ordering within `Update`: `FireEvents → ProcessEvents → BridgeEvents`
 
 ### UI layers
 
-- **TUI screens** (`src/ui/screen/`): `StartMenu`, `Explorer`, `Fleet`, `Editor`, `Scheduler`. Each screen has a `*Context` resource and a `*Screen` widget. Screens are rendered in `PostUpdate/RenderSet`.
+Both the TUI and the simulation now render in a **single Bevy window** — no terminal window.
+
+- **TUI overlay** (`src/ui/tui_overlay.rs`): Ratatui renders to a `TestBackend` buffer (80×30 chars, top-left of the window). Each frame the buffer is converted to Bevy `Text` entities and displayed as a Bevy UI overlay (`ZIndex::Global(100)`). Font: `assets/fonts/mono.ttf`.
+- **TUI screens** (`src/ui/screen/`): `StartMenu`, `Explorer`, `Fleet`, `Editor`, `Scheduler`. Each screen renders to the fixed `TUI_COLS×TUI_ROWS` area (top-left). Screens with popups (currently only `Fleet`) have a separate widget (`FleetPopup`) that renders centered on the full window.
+- **TUI input** (`src/ui/tui_input.rs`): Bevy `KeyboardInput` events are converted to `bevy_ratatui::event::KeyEvent` (crossterm) and dispatched as before — no terminal raw mode, no crossterm event polling.
 - **Bevy GUI** (`src/ui/gui/`): 2D Bevy window showing orbits, ship positions and prediction gizmos. Mouse pan (hold LMB) and click-to-select are handled here.
 - **Widgets** (`src/ui/widget/`): reusable Ratatui widgets — `SpaceMap` (ASCII minimap), `SearchWidget`, `TreeWidget`, `InfoWidget`.
 
