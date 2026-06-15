@@ -44,11 +44,9 @@ fn lua_to_bevy_bridge(
     for event_name in bus.emitted.drain(..) {
         match event_name.as_str() {
             "pause_game" => {
-                info!("[scripting] pause_game → TimeEvent::PauseTime");
                 time_events.send(TimeEvent::PauseTime);
             }
             "resume_game" => {
-                info!("[scripting] resume_game → TimeEvent::StartTime");
                 time_events.send(TimeEvent::StartTime);
             }
             _ => {}
@@ -62,9 +60,8 @@ fn lua_to_bevy_bridge(
 /// Runs once when the game enters the `Loaded` state.
 fn load_event_scripts(mut bus: NonSendMut<LuaEventBus>) {
     let dir = std::path::Path::new("src/scripts/events");
-    info!("[scripting] load_event_scripts: looking in '{}'", dir.display());
     if !dir.exists() {
-        warn!("[scripting] directory not found — no scripts loaded");
+        warn!("[scripting] scripts directory '{}' not found", dir.display());
         return;
     }
     let Ok(entries) = std::fs::read_dir(dir) else { return };
@@ -76,8 +73,6 @@ fn load_event_scripts(mut bus: NonSendMut<LuaEventBus>) {
                     let name = path.file_name().unwrap_or_default().to_string_lossy().into_owned();
                     if let Err(e) = bus.load_script(&source, &name) {
                         warn!("[scripting] Failed to load '{}': {e}", path.display());
-                    } else {
-                        info!("[scripting] Loaded '{}'", path.display());
                     }
                 }
                 Err(e) => warn!("[scripting] Cannot read '{}': {e}", path.display()),

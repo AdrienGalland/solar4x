@@ -137,6 +137,12 @@ fn process_lua_events(mut bus: NonSendMut<LuaEventBus>) {
             }
         }
     }
+
+    // Expose secondary events (fired by Lua handlers during this pass) to the bridge
+    // immediately, so lua_to_bevy_bridge can react in the same frame.
+    // They stay in pending and will be processed by Lua handlers next frame.
+    let secondary: Vec<String> = bus.pending.borrow().iter().map(|(n, _)| n.clone()).collect();
+    bus.emitted.extend(secondary);
 }
 
 fn resume_thread(thread: &Thread, data: Value) -> Option<String> {

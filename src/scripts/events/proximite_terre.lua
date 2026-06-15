@@ -2,7 +2,7 @@
 -- La pause ne se déclenche qu'au premier passage sous le seuil.
 -- Si le jeu démarre avec le vaisseau déjà proche, aucune pause.
 
-local SEUIL = 10000.0  -- distance critique en km (modifiable ici)
+local SEUIL = 100000.0  -- distance critique en km (modifiable ici)
 
 -- Etat par vaisseau : nil = premier tick (pas encore de référence), true/false ensuite
 local etait_proche = {}
