@@ -1,3 +1,4 @@
+pub mod bridge;
 pub mod event_bus;
 
 use std::{
@@ -28,7 +29,7 @@ pub struct ScriptingPlugin;
 
 impl Plugin for ScriptingPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(event_bus::EventBusPlugin)
+        app.add_plugins((event_bus::EventBusPlugin, bridge::BridgePlugin))
             .init_resource::<ScriptSettings>()
             .add_systems(
                 FixedUpdate,

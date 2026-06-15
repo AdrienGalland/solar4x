@@ -3,29 +3,44 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use bevy::prelude::*;
 use mlua::{Function, Lua, Thread, Value};
 
-// ── Waiter ──────────────────────────────────────────────────────────────────
+// ── System ordering ──────────────────────────────────────────────────────────
 
-/// A coroutine suspended at a `wait_for(event)` call.
+/// Ordering within the scripting pipeline (all in `Update`):
+///   FireEvents → ProcessEvents → BridgeEvents
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ScriptingSet {
+    /// Rust systems that fire events into the bus (e.g. proximity check).
+    FireEvents,
+    /// Drains the pending queue, runs Lua handlers/coroutines.
+    ProcessEvents,
+    /// Reads `emitted` and translates Lua events into Bevy actions.
+    BridgeEvents,
+}
+
+// ── Waiter ───────────────────────────────────────────────────────────────────
+
 struct Waiter {
     thread: Thread,
     waiting_for: String,
 }
 
-// ── LuaEventBus ─────────────────────────────────────────────────────────────
+// ── LuaEventBus ──────────────────────────────────────────────────────────────
 
 /// Persistent Lua state and event bus.
 ///
 /// Stored as a NonSend resource because `mlua::Lua` is `!Send`.
-/// Other systems can fire events via `bus.fire(event, data)` by adding
-/// `NonSendMut<LuaEventBus>` as a system parameter.
+/// To fire an event from a Rust system, add `NonSendMut<LuaEventBus>` as a
+/// parameter and call `bus.fire(event, data)`.
 pub struct LuaEventBus {
-    lua: Lua,
-    /// handlers registered with `on("event", fn)` in Lua scripts
+    /// Exposed so bridge systems can build Lua tables via `bus.lua.create_table()`.
+    pub(crate) lua: Lua,
     handlers: HashMap<String, Vec<Function>>,
-    /// coroutines suspended on `wait_for(...)`
     waiters: Vec<Waiter>,
-    /// events pending processing this frame (filled by Lua `fire()` and `LuaEventBus::fire`)
+    /// Filled by `fire()` calls (from Lua and Rust); drained by `process_lua_events`.
     pending: Rc<RefCell<Vec<(String, Value)>>>,
+    /// Every event name processed this frame — read by `BridgeEvents` systems.
+    /// Cleared at the start of each `process_lua_events` run.
+    pub emitted: Vec<String>,
 }
 
 impl LuaEventBus {
@@ -33,7 +48,6 @@ impl LuaEventBus {
         let lua = Lua::new();
         let pending: Rc<RefCell<Vec<(String, Value)>>> = Default::default();
 
-        // `fire("event", data)` — callable from Lua scripts
         let pending_clone = pending.clone();
         lua.globals().set(
             "fire",
@@ -43,7 +57,6 @@ impl LuaEventBus {
             })?,
         )?;
 
-        // `wait_for("event")` — yields the current coroutine; resumes with event data
         lua.load("function wait_for(event) return coroutine.yield(event) end")
             .exec()?;
 
@@ -52,12 +65,12 @@ impl LuaEventBus {
             handlers: HashMap::new(),
             waiters: vec![],
             pending,
+            emitted: vec![],
         })
     }
 
     /// Load a Lua script and register all `on("event", fn)` handlers declared in it.
-    ///
-    /// Call this once per script file (e.g., when a ship is spawned).
+    /// Call once per script (e.g. when a ship spawns or at startup).
     pub fn load_script(&mut self, source: &str, name: &str) -> mlua::Result<()> {
         let collected: Rc<RefCell<Vec<(String, Function)>>> = Default::default();
         let collected_clone = collected.clone();
@@ -76,36 +89,27 @@ impl LuaEventBus {
         Ok(())
     }
 
-    /// Fire an event from Rust (e.g., from a bridge system reacting to a Bevy event).
+    /// Fire an event from Rust.
     pub fn fire(&self, event: &str, data: Value) {
         self.pending.borrow_mut().push((event.to_string(), data));
     }
 
-    /// Convenience: fire an event with no data payload.
+    /// Fire an event with no data payload.
     pub fn fire_empty(&self, event: &str) {
         self.fire(event, Value::Nil);
     }
-
-    /// Build a Lua table from key-value string pairs, useful for Rust-side `fire` calls.
-    pub fn make_table(
-        &self,
-        fields: &[(&str, Value)],
-    ) -> mlua::Result<Value> {
-        let table = self.lua.create_table()?;
-        for (k, v) in fields {
-            table.set(*k, v.clone())?;
-        }
-        Ok(Value::Table(table))
-    }
 }
 
-// ── Processing system ────────────────────────────────────────────────────────
+// ── Processing system ─────────────────────────────────────────────────────────
 
 fn process_lua_events(mut bus: NonSendMut<LuaEventBus>) {
+    bus.emitted.clear();
     let events: Vec<(String, Value)> = bus.pending.borrow_mut().drain(..).collect();
 
     for (event_name, data) in events {
-        // Resume coroutines that were waiting for this event
+        bus.emitted.push(event_name.clone());
+
+        // Resume coroutines waiting for this event
         let waiters = std::mem::take(&mut bus.waiters);
         let mut remaining = Vec::new();
         for waiter in waiters {
@@ -135,8 +139,6 @@ fn process_lua_events(mut bus: NonSendMut<LuaEventBus>) {
     }
 }
 
-/// Resume a coroutine with `data`. Returns the next event name if the coroutine
-/// yielded again (i.e., called `wait_for`), or `None` if it finished.
 fn resume_thread(thread: &Thread, data: Value) -> Option<String> {
     match thread.resume::<Value>(data) {
         Ok(Value::String(s)) => s.to_str().ok().map(|b| b.to_string()),
@@ -148,7 +150,7 @@ fn resume_thread(thread: &Thread, data: Value) -> Option<String> {
     }
 }
 
-// ── Plugin ───────────────────────────────────────────────────────────────────
+// ── Plugin ────────────────────────────────────────────────────────────────────
 
 pub struct EventBusPlugin;
 
@@ -156,6 +158,11 @@ impl Plugin for EventBusPlugin {
     fn build(&self, app: &mut App) {
         let bus = LuaEventBus::new().expect("Failed to initialize Lua event bus");
         app.insert_non_send_resource(bus)
-            .add_systems(Update, process_lua_events);
+            .configure_sets(
+                Update,
+                (ScriptingSet::FireEvents, ScriptingSet::ProcessEvents, ScriptingSet::BridgeEvents)
+                    .chain(),
+            )
+            .add_systems(Update, process_lua_events.in_set(ScriptingSet::ProcessEvents));
     }
 }
