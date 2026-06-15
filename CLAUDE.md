@@ -52,7 +52,8 @@ ClientPlugin
     ├── ShipsPlugin
     │   └── trajectory::plugin — ManeuverNode dispatch & thrust application
     └── ScriptingPlugin        — Lua scripting for ships (src/scripting.rs)
-        └── EventBusPlugin     — Lua event bus with coroutine support
+        ├── EventBusPlugin     — Lua event bus with coroutine support
+        └── BridgePlugin       — built-in events & Lua→Bevy bridge (src/scripting/bridge.rs)
 TuiPlugin                      — Ratatui screens & input system sets
 GuiPlugin                      — Bevy 2D rendering, camera, gizmos
 ```
@@ -111,6 +112,17 @@ Scripts are stateless per tick (a fresh `Lua` VM is created each call). For stat
 - `LuaEventBus::fire` / `fire_empty` — fire events from Rust systems
 
 Events are processed each frame by the `process_lua_events` system (`Update` schedule). Rust systems can access the bus via `NonSendMut<LuaEventBus>`.
+
+System ordering within `Update`: `FireEvents → ProcessEvents → BridgeEvents`.
+
+**Event scripts** are loaded once from `src/scripts/events/` on `OnEnter(Loaded)`. Each `.lua` file in that directory is executed immediately (registering `on(...)` handlers); the handlers then run as coroutines each time the matching event fires.
+
+**Built-in events (fired by `BridgePlugin`):**
+- `ship_tick` — fired once per ship per frame while the simulation is running; data: `{ ship_id: string, distances: { body_id → number } }`
+
+**Events handled by `BridgePlugin` (fire from Lua to control the game):**
+- `pause_game` — sends `TimeEvent::PauseTime`
+- `resume_game` — sends `TimeEvent::StartTime`
 
 ### UI layers
 
