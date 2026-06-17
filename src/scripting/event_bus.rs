@@ -38,9 +38,9 @@ pub struct LuaEventBus {
     waiters: Vec<Waiter>,
     /// Filled by `fire()` calls (from Lua and Rust); drained by `process_lua_events`.
     pending: Rc<RefCell<Vec<(String, Value)>>>,
-    /// Every event name processed this frame — read by `BridgeEvents` systems.
+    /// Every (event name, payload) processed this frame — read by `BridgeEvents` systems.
     /// Cleared at the start of each `process_lua_events` run.
-    pub emitted: Vec<String>,
+    pub emitted: Vec<(String, Value)>,
 }
 
 impl LuaEventBus {
@@ -107,7 +107,7 @@ fn process_lua_events(mut bus: NonSendMut<LuaEventBus>) {
     let events: Vec<(String, Value)> = bus.pending.borrow_mut().drain(..).collect();
 
     for (event_name, data) in events {
-        bus.emitted.push(event_name.clone());
+        bus.emitted.push((event_name.clone(), data.clone()));
 
         // Resume coroutines waiting for this event
         let waiters = std::mem::take(&mut bus.waiters);
@@ -141,8 +141,135 @@ fn process_lua_events(mut bus: NonSendMut<LuaEventBus>) {
     // Expose secondary events (fired by Lua handlers during this pass) to the bridge
     // immediately, so lua_to_bevy_bridge can react in the same frame.
     // They stay in pending and will be processed by Lua handlers next frame.
-    let secondary: Vec<String> = bus.pending.borrow().iter().map(|(n, _)| n.clone()).collect();
+    let secondary: Vec<(String, Value)> = bus.pending.borrow().iter()
+        .map(|(n, v)| (n.clone(), v.clone()))
+        .collect();
     bus.emitted.extend(secondary);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bevy::prelude::*;
+
+    fn setup() -> App {
+        let mut app = App::new();
+        let bus = LuaEventBus::new().expect("lua init failed");
+        app.insert_non_send_resource(bus);
+        app.configure_sets(
+            Update,
+            (ScriptingSet::FireEvents, ScriptingSet::ProcessEvents, ScriptingSet::BridgeEvents).chain(),
+        );
+        app.add_systems(Update, process_lua_events.in_set(ScriptingSet::ProcessEvents));
+        app
+    }
+
+    #[test]
+    fn test_handler_executes_on_fire() {
+        let mut app = setup();
+        {
+            let mut bus = app.world_mut().non_send_resource_mut::<LuaEventBus>();
+            bus.load_script(r#"on("ping", function(d) _G.ping_ok = true end)"#, "test").unwrap();
+            bus.fire("ping", Value::Nil);
+        }
+        app.update();
+        let bus = app.world().non_send_resource::<LuaEventBus>();
+        let ok: bool = bus.lua.globals().get("ping_ok").unwrap_or(false);
+        assert!(ok);
+    }
+
+    #[test]
+    fn test_handler_receives_table_payload() {
+        let mut app = setup();
+        {
+            let mut bus = app.world_mut().non_send_resource_mut::<LuaEventBus>();
+            bus.load_script(
+                r#"on("data_event", function(d) _G.received = d.value end)"#,
+                "test",
+            ).unwrap();
+            let t = bus.lua.create_table().unwrap();
+            t.set("value", 42_i64).unwrap();
+            bus.fire("data_event", Value::Table(t));
+        }
+        app.update();
+        let bus = app.world().non_send_resource::<LuaEventBus>();
+        let val: i64 = bus.lua.globals().get("received").unwrap_or(0);
+        assert_eq!(val, 42);
+    }
+
+    #[test]
+    fn test_emitted_contains_event_after_process() {
+        let mut app = setup();
+        {
+            let mut bus = app.world_mut().non_send_resource_mut::<LuaEventBus>();
+            bus.load_script(r#"on("ev", function(d) end)"#, "test").unwrap();
+            bus.fire("ev", Value::Nil);
+        }
+        app.update();
+        let bus = app.world().non_send_resource::<LuaEventBus>();
+        assert!(bus.emitted.iter().any(|(name, _)| name == "ev"));
+    }
+
+    #[test]
+    fn test_secondary_event_in_emitted_same_frame() {
+        let mut app = setup();
+        {
+            let mut bus = app.world_mut().non_send_resource_mut::<LuaEventBus>();
+            bus.load_script(
+                r#"on("trigger", function(d) fire("secondary", {}) end)"#,
+                "test",
+            ).unwrap();
+            bus.fire("trigger", Value::Nil);
+        }
+        app.update();
+        let bus = app.world().non_send_resource::<LuaEventBus>();
+        assert!(
+            bus.emitted.iter().any(|(name, _)| name == "secondary"),
+            "secondary event fired by a handler should appear in emitted the same frame",
+        );
+    }
+
+    #[test]
+    fn test_wait_for_suspends_then_resumes() {
+        let mut app = setup();
+        {
+            let mut bus = app.world_mut().non_send_resource_mut::<LuaEventBus>();
+            bus.load_script(
+                r#"
+                on("start", function(d)
+                    wait_for("step2")
+                    _G.reached = true
+                end)
+                "#,
+                "test",
+            ).unwrap();
+            bus.fire("start", Value::Nil);
+        }
+        app.update();
+        {
+            let bus = app.world().non_send_resource::<LuaEventBus>();
+            let reached: bool = bus.lua.globals().get("reached").unwrap_or(false);
+            assert!(!reached, "coroutine should be suspended, not yet past wait_for");
+        }
+        {
+            let mut bus = app.world_mut().non_send_resource_mut::<LuaEventBus>();
+            bus.fire("step2", Value::Nil);
+        }
+        app.update();
+        let bus = app.world().non_send_resource::<LuaEventBus>();
+        let reached: bool = bus.lua.globals().get("reached").unwrap_or(false);
+        assert!(reached, "coroutine should have resumed after step2 fires");
+    }
+
+    #[test]
+    fn test_no_handler_no_error() {
+        let mut app = setup();
+        {
+            let bus = app.world_mut().non_send_resource_mut::<LuaEventBus>();
+            bus.fire("unregistered_event", Value::Nil);
+        }
+        app.update(); // must not panic
+    }
 }
 
 fn resume_thread(thread: &Thread, data: Value) -> Option<String> {

@@ -8,7 +8,7 @@ local SEUIL = 100000.0  -- distance critique en km (modifiable ici)
 local etait_proche = {}
 
 on("ship_tick", function(data)
-    local d = data.distances["terre"]
+    local d = data.bodies["terre"]
     if d == nil then return end
 
     local actuel = d < SEUIL

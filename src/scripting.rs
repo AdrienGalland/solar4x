@@ -237,6 +237,158 @@ mod tests {
 
     use super::*;
 
+    // ── Lua component library tests ───────────────────────────────────────────
+
+    const LIB_COMPOSANTS: &str = include_str!("scripts/events/_lib_composants.lua");
+
+    fn setup_lib_app() -> App {
+        let mut app = App::new();
+        app.add_plugins(event_bus::EventBusPlugin);
+        {
+            let mut bus = app.world_mut().non_send_resource_mut::<event_bus::LuaEventBus>();
+            bus.load_script(LIB_COMPOSANTS, "_lib_composants.lua")
+                .expect("lib_composants should load without errors");
+        }
+        app
+    }
+
+    #[test]
+    fn test_lib_declare_and_get_fuel() {
+        let mut app = setup_lib_app();
+        let mut bus = app.world_mut().non_send_resource_mut::<event_bus::LuaEventBus>();
+        bus.lua.load(r#"declare_components("s", { tanks = { main = { capacite = 100.0, carburant = 75.0 } } })"#)
+            .exec().unwrap();
+        let fuel: f64 = bus.lua.load(r#"return get_fuel("s", "main")"#).eval().unwrap();
+        assert_eq!(fuel, 75.0);
+    }
+
+    #[test]
+    fn test_lib_empty_tank_deducts_fuel() {
+        let mut app = setup_lib_app();
+        let mut bus = app.world_mut().non_send_resource_mut::<event_bus::LuaEventBus>();
+        bus.lua.load(r#"declare_components("s", { tanks = { main = { capacite = 100.0, carburant = 80.0 } } })"#)
+            .exec().unwrap();
+        let ok: bool = bus.lua.load(r#"return empty_tank("s", "main", 30.0)"#).eval().unwrap();
+        assert!(ok, "empty_tank should succeed when enough fuel");
+        let remaining: f64 = bus.lua.load(r#"return get_fuel("s", "main")"#).eval().unwrap();
+        assert_eq!(remaining, 50.0);
+    }
+
+    #[test]
+    fn test_lib_empty_tank_fails_when_insufficient_fuel() {
+        let mut app = setup_lib_app();
+        let mut bus = app.world_mut().non_send_resource_mut::<event_bus::LuaEventBus>();
+        bus.lua.load(r#"declare_components("s", { tanks = { main = { capacite = 100.0, carburant = 10.0 } } })"#)
+            .exec().unwrap();
+        let ok: bool = bus.lua.load(r#"return empty_tank("s", "main", 50.0)"#).eval().unwrap();
+        assert!(!ok, "empty_tank should fail when not enough fuel");
+        let unchanged: f64 = bus.lua.load(r#"return get_fuel("s", "main")"#).eval().unwrap();
+        assert_eq!(unchanged, 10.0, "fuel should not have changed on failed drain");
+    }
+
+    #[test]
+    fn test_lib_use_thruster_fires_apply_thrust_event() {
+        let mut app = setup_lib_app();
+        {
+            let mut bus = app.world_mut().non_send_resource_mut::<event_bus::LuaEventBus>();
+            bus.load_script(
+                r#"
+                declare_components("s", {
+                    tanks     = { main = { capacite = 100.0, carburant = 100.0 } },
+                    thrusters = { main = { force_max = 10.0, consommation = 0.1, reservoir = "main" } },
+                })
+                on("go", function(d)
+                    use_thruster("s", "main", 1.0, { x = 1.0, y = 0.0, z = 0.0 })
+                end)
+                "#,
+                "ship_test",
+            ).unwrap();
+            bus.fire("go", mlua::Value::Nil);
+        }
+        app.update();
+        let bus = app.world().non_send_resource::<event_bus::LuaEventBus>();
+        assert!(
+            bus.emitted.iter().any(|(name, _)| name == "apply_thrust"),
+            "use_thruster should fire an apply_thrust event",
+        );
+    }
+
+    #[test]
+    fn test_lib_use_thruster_fails_without_fuel() {
+        let mut app = setup_lib_app();
+        {
+            let mut bus = app.world_mut().non_send_resource_mut::<event_bus::LuaEventBus>();
+            bus.load_script(
+                r#"
+                declare_components("s", {
+                    tanks     = { main = { capacite = 100.0, carburant = 0.0 } },
+                    thrusters = { main = { force_max = 10.0, consommation = 0.1, reservoir = "main" } },
+                })
+                on("go", function(d)
+                    _G.result = use_thruster("s", "main", 1.0, { x = 1.0, y = 0.0, z = 0.0 })
+                end)
+                "#,
+                "ship_test",
+            ).unwrap();
+            bus.fire("go", mlua::Value::Nil);
+        }
+        app.update();
+        let bus = app.world().non_send_resource::<event_bus::LuaEventBus>();
+        let result: bool = bus.lua.globals().get("result").unwrap_or(true);
+        assert!(!result, "use_thruster should return false when tank is empty");
+        assert!(
+            !bus.emitted.iter().any(|(name, _)| name == "apply_thrust"),
+            "no apply_thrust event should be fired when tank is empty",
+        );
+    }
+
+    #[test]
+    fn test_lib_detect_obstacle_returns_objects_within_range() {
+        let mut app = setup_lib_app();
+        let mut bus = app.world_mut().non_send_resource_mut::<event_bus::LuaEventBus>();
+        bus.lua.load(r#"declare_components("s", { sensors = { radar = { portee = 50000.0 } } })"#)
+            .exec().unwrap();
+        let count: i64 = bus.lua.load(r#"
+            local data = {
+                ship_id = "s",
+                bodies  = { terre = 30000.0, mars = 80000.0 },
+                ships   = { other = 10000.0 },
+            }
+            return #detect_obstacle(data, "radar")
+        "#).eval().unwrap();
+        assert_eq!(count, 2, "should detect terre (30 000 km) and other (10 000 km), not mars (80 000 km)");
+    }
+
+    #[test]
+    fn test_lib_detect_obstacle_sorted_by_distance() {
+        let mut app = setup_lib_app();
+        let mut bus = app.world_mut().non_send_resource_mut::<event_bus::LuaEventBus>();
+        bus.lua.load(r#"declare_components("s", { sensors = { radar = { portee = 50000.0 } } })"#)
+            .exec().unwrap();
+        let first_id: String = bus.lua.load(r#"
+            local data = {
+                ship_id = "s",
+                bodies  = { terre = 30000.0 },
+                ships   = { other = 10000.0 },
+            }
+            local results = detect_obstacle(data, "radar")
+            return results[1].id
+        "#).eval().unwrap();
+        assert_eq!(first_id, "other", "closest object should be first in the results list");
+    }
+
+    #[test]
+    fn test_lib_detect_obstacle_unknown_sensor_returns_empty() {
+        let mut app = setup_lib_app();
+        let mut bus = app.world_mut().non_send_resource_mut::<event_bus::LuaEventBus>();
+        bus.lua.load(r#"declare_components("s", { sensors = {} })"#).exec().unwrap();
+        let count: i64 = bus.lua.load(r#"
+            local data = { ship_id = "s", bodies = { terre = 100.0 }, ships = {} }
+            return #detect_obstacle(data, "radar")
+        "#).eval().unwrap();
+        assert_eq!(count, 0, "unknown sensor id should return empty list");
+    }
+
     fn body_query_app() -> App {
         let mut app = App::new();
         let earth = app
