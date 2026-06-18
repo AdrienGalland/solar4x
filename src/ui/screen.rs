@@ -5,6 +5,7 @@ use explorer::{ExplorerContext, ExplorerScreen};
 use fleet::{FleetContext, FleetPopup, FleetScreen};
 use start::{StartMenu, StartMenuContext};
 
+use crate::ui::tui_config::{TuiWindowMode, TuiWindowSettings};
 use crate::ui::tui_overlay::{PopupOverlayMarker, PopupTuiContext, TuiContext};
 
 use crate::{
@@ -114,6 +115,7 @@ fn render(
     mut fleet: Option<ResMut<FleetContext>>,
     mut editor: Option<ResMut<EditorContext>>,
     mut space_map: Option<ResMut<SpaceMap>>,
+    tui_settings: Option<Res<TuiWindowSettings>>,
 ) -> color_eyre::Result<()> {
     let fleet_has_popup = fleet.as_deref().map(|f| f.has_popup()).unwrap_or(false);
 
@@ -122,7 +124,11 @@ fn render(
         match screen.get() {
             AppScreen::StartMenu => {
                 if let Some(sm) = start_menu.as_deref_mut() {
-                    f.render_stateful_widget(StartMenu, full_area, sm);
+                    let tui_mode = tui_settings
+                        .as_deref()
+                        .map(|s| s.get_mode())
+                        .unwrap_or(TuiWindowMode::Integrated);
+                    f.render_stateful_widget(StartMenu { tui_mode }, full_area, sm);
                 }
             }
             AppScreen::Explorer => {

@@ -261,12 +261,14 @@ fn pan_when_dragging(mut motions: EventReader<MouseMotion>, mut map: ResMut<Spac
 fn send_select_object_event(
     mut clicks: EventReader<MouseButtonInput>,
     window: Query<&Window, With<PrimaryWindow>>,
-    cam: Query<(&Camera, &GlobalTransform)>,
+    cam: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     mut writer: EventWriter<SelectObjectEvent>,
     objects: Query<(Entity, &GlobalTransform, &SelectionRadius)>,
     map: Res<SpaceMap>,
 ) {
-    let (cam, cam_transform) = cam.single();
+    let Ok((cam, cam_transform)) = cam.get_single() else {
+        return;
+    };
     for event in clicks.read() {
         if matches!(
             (event.state, event.button),
@@ -291,11 +293,13 @@ fn send_select_object_event(
 
 fn update_camera_pos(
     space_map: Res<SpaceMap>,
-    mut cam: Query<(&mut Transform, &mut Projection)>,
+    mut cam: Query<(&mut Transform, &mut Projection), With<Camera3d>>,
     positions: Query<&Position>,
 ) {
     let scale = MAX_HEIGHT as f64 / space_map.system_size;
-    let (mut cam_pos, mut proj) = cam.single_mut();
+    let Ok((mut cam_pos, mut proj)) = cam.get_single_mut() else {
+        return;
+    };
     let focus_pos = space_map
         .focus_body
         .map_or(DVec3::default(), |f| positions.get(f).unwrap().0);

@@ -5,8 +5,10 @@ use crate::input::prelude::Keymap;
 
 pub mod gui;
 pub mod screen;
+pub mod tui_config;
 pub mod tui_input;
 pub mod tui_overlay;
+pub mod tui_window;
 pub mod widget;
 
 pub mod prelude {
@@ -43,10 +45,12 @@ impl Plugin for TuiPlugin {
             .configure_sets(Update, (InputReading, EventHandling).chain());
 
         if !self.headless {
-            app.add_plugins(tui_overlay::plugin).add_systems(
-                PreUpdate,
-                tui_input::bevy_keyboard_to_key_event,
-            );
+            app.add_plugins((
+                tui_overlay::plugin,
+                tui_config::TuiWindowConfigPlugin,
+                tui_window::TuiWindowPlugin,
+            ))
+            .add_systems(PreUpdate, tui_input::bevy_keyboard_to_key_event);
 
             // Initialize TuiContext once the window is available.
             app.add_systems(Startup, init_tui_context);
