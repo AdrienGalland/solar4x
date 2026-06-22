@@ -27,6 +27,19 @@ function declare_components(ship_id, config)
     }
 end
 
+-- Renvoie la portée maximale parmi tous les capteurs du vaisseau (0 si aucun).
+function get_max_sensor_range(ship_id)
+    local c = _composants[ship_id]
+    if c == nil then return 0 end
+    local max_range = 0
+    for _, sensor in pairs(c.sensors) do
+        if sensor.portee > max_range then
+            max_range = sensor.portee
+        end
+    end
+    return max_range
+end
+
 -- Renvoie le carburant restant dans un tank (0 si inconnu).
 function get_fuel(ship_id, tank_id)
     local c = _composants[ship_id]

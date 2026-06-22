@@ -389,6 +389,49 @@ mod tests {
         assert_eq!(count, 0, "unknown sensor id should return empty list");
     }
 
+    #[test]
+    fn test_lib_get_max_sensor_range_single_sensor() {
+        let mut app = setup_lib_app();
+        let mut bus = app.world_mut().non_send_resource_mut::<event_bus::LuaEventBus>();
+        bus.lua.load(r#"declare_components("s", { sensors = { radar = { portee = 75000.0 } } })"#)
+            .exec().unwrap();
+        let range: f64 = bus.lua.load(r#"return get_max_sensor_range("s")"#).eval().unwrap();
+        assert_eq!(range, 75000.0);
+    }
+
+    #[test]
+    fn test_lib_get_max_sensor_range_returns_largest() {
+        let mut app = setup_lib_app();
+        let mut bus = app.world_mut().non_send_resource_mut::<event_bus::LuaEventBus>();
+        bus.lua.load(r#"
+            declare_components("s", {
+                sensors = {
+                    radar_av = { portee = 50000.0 },
+                    radar_ar = { portee = 100000.0 },
+                }
+            })
+        "#).exec().unwrap();
+        let range: f64 = bus.lua.load(r#"return get_max_sensor_range("s")"#).eval().unwrap();
+        assert_eq!(range, 100000.0, "should return the largest sensor range");
+    }
+
+    #[test]
+    fn test_lib_get_max_sensor_range_no_sensors_returns_zero() {
+        let mut app = setup_lib_app();
+        let mut bus = app.world_mut().non_send_resource_mut::<event_bus::LuaEventBus>();
+        bus.lua.load(r#"declare_components("s", { sensors = {} })"#).exec().unwrap();
+        let range: f64 = bus.lua.load(r#"return get_max_sensor_range("s")"#).eval().unwrap();
+        assert_eq!(range, 0.0, "no sensors should return 0");
+    }
+
+    #[test]
+    fn test_lib_get_max_sensor_range_undeclared_ship_returns_zero() {
+        let mut app = setup_lib_app();
+        let bus = app.world_mut().non_send_resource_mut::<event_bus::LuaEventBus>();
+        let range: f64 = bus.lua.load(r#"return get_max_sensor_range("inconnu")"#).eval().unwrap();
+        assert_eq!(range, 0.0, "undeclared ship should return 0");
+    }
+
     fn body_query_app() -> App {
         let mut app = App::new();
         let earth = app
