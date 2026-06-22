@@ -8,6 +8,10 @@ pub const TUI_ROWS: u16 = 30;
 pub const POPUP_COLS: u16 = 72;
 pub const POPUP_ROWS: u16 = 24;
 pub const FONT_SIZE: f32 = 14.0;
+/// character width = FONT_SIZE * FONT_W_RATIO
+pub const FONT_W_RATIO: f32 = 0.6;
+/// line height   = FONT_SIZE * FONT_H_RATIO
+pub const FONT_H_RATIO: f32 = 1.2;
 
 // ── Resources ────────────────────────────────────────────────────────────────
 
@@ -44,6 +48,25 @@ impl PopupTuiContext {
 #[derive(Resource)]
 pub struct PopupTuiRows(pub Vec<Entity>);
 
+/// Current font size for TUI rendering. Normally FONT_SIZE; overridden in SeparateWindow mode
+/// so the text fills the TUI window regardless of its pixel dimensions.
+#[derive(Resource)]
+pub struct TuiWindowFontSize(pub f32);
+
+impl Default for TuiWindowFontSize {
+    fn default() -> Self {
+        TuiWindowFontSize(FONT_SIZE)
+    }
+}
+
+/// Root entity of the main TUI overlay node (used to retarget to a second window).
+#[derive(Resource)]
+pub struct MainOverlayRoot(pub Entity);
+
+/// Root entity of the popup overlay node (used to retarget to a second window).
+#[derive(Resource)]
+pub struct PopupOverlayRoot(pub Entity);
+
 /// Marks the full-screen backdrop node used for popups.
 #[derive(Component)]
 pub struct PopupOverlayMarker;
@@ -51,18 +74,23 @@ pub struct PopupOverlayMarker;
 // ── Plugin ────────────────────────────────────────────────────────────────────
 
 pub fn plugin(app: &mut App) {
-    app.add_systems(
-        Startup,
-        (
-            load_font,
-            setup_main_overlay.after(load_font),
-            setup_popup_overlay.after(load_font),
-        ),
-    )
-    .add_systems(
-        PostUpdate,
-        (update_main_overlay_from_buffer, update_popup_overlay_from_buffer),
-    );
+    app.init_resource::<TuiWindowFontSize>()
+        .add_systems(
+            Startup,
+            (
+                load_font,
+                setup_main_overlay.after(load_font),
+                setup_popup_overlay.after(load_font),
+            ),
+        )
+        .add_systems(
+            PostUpdate,
+            (
+                sync_row_heights.run_if(resource_changed::<TuiWindowFontSize>),
+                update_main_overlay_from_buffer,
+                update_popup_overlay_from_buffer,
+            ),
+        );
 }
 
 // ── Startup systems ───────────────────────────────────────────────────────────
@@ -94,6 +122,7 @@ fn setup_main_overlay(mut commands: Commands, _font: Res<TuiFont>) {
         rows.push(row);
     }
     commands.insert_resource(TuiRows(rows));
+    commands.insert_resource(MainOverlayRoot(root));
 }
 
 fn setup_popup_overlay(mut commands: Commands, _font: Res<TuiFont>) {
@@ -128,6 +157,7 @@ fn setup_popup_overlay(mut commands: Commands, _font: Res<TuiFont>) {
         rows.push(row);
     }
     commands.insert_resource(PopupTuiRows(rows));
+    commands.insert_resource(PopupOverlayRoot(overlay));
 }
 
 fn spawn_text_row(commands: &mut Commands) -> Entity {
@@ -146,10 +176,33 @@ fn spawn_text_row(commands: &mut Commands) -> Entity {
 
 // ── Per-frame update systems ──────────────────────────────────────────────────
 
+/// Update row heights when the font size changes (e.g. on switch to/from separate window).
+fn sync_row_heights(
+    fs_res: Res<TuiWindowFontSize>,
+    tui_rows: Option<Res<TuiRows>>,
+    popup_rows: Option<Res<PopupTuiRows>>,
+    mut styles: Query<&mut Style>,
+) {
+    let h = Val::Px(fs_res.0 * FONT_H_RATIO);
+    for rows in [
+        tui_rows.as_deref().map(|r| r.0.as_slice()),
+        popup_rows.as_deref().map(|r| r.0.as_slice()),
+    ]
+    .into_iter()
+    .flatten()
+    .flatten()
+    {
+        if let Ok(mut s) = styles.get_mut(*rows) {
+            s.height = h;
+        }
+    }
+}
+
 fn update_main_overlay_from_buffer(
     tui_ctx: Option<Res<TuiContext>>,
     tui_rows: Option<Res<TuiRows>>,
     font: Option<Res<TuiFont>>,
+    fs_res: Res<TuiWindowFontSize>,
     mut query: Query<&mut Text>,
 ) {
     let (Some(ctx), Some(rows), Some(font)) = (tui_ctx, tui_rows, font) else {
@@ -169,7 +222,12 @@ fn update_main_overlay_from_buffer(
             text.sections.clear();
             continue;
         }
-        fill_text_sections(&mut text, &buffer.content[start as usize..end as usize], &font.0);
+        fill_text_sections(
+            &mut text,
+            &buffer.content[start as usize..end as usize],
+            &font.0,
+            fs_res.0,
+        );
     }
 }
 
@@ -177,6 +235,7 @@ fn update_popup_overlay_from_buffer(
     popup_ctx: Option<Res<PopupTuiContext>>,
     popup_rows: Option<Res<PopupTuiRows>>,
     font: Option<Res<TuiFont>>,
+    fs_res: Res<TuiWindowFontSize>,
     mut query: Query<&mut Text>,
 ) {
     let (Some(ctx), Some(rows), Some(font)) = (popup_ctx, popup_rows, font) else {
@@ -195,11 +254,21 @@ fn update_popup_overlay_from_buffer(
             text.sections.clear();
             continue;
         }
-        fill_text_sections(&mut text, &buffer.content[start as usize..end], &font.0);
+        fill_text_sections(
+            &mut text,
+            &buffer.content[start as usize..end],
+            &font.0,
+            fs_res.0,
+        );
     }
 }
 
-fn fill_text_sections(text: &mut Text, cells: &[ratatui::buffer::Cell], font: &Handle<Font>) {
+fn fill_text_sections(
+    text: &mut Text,
+    cells: &[ratatui::buffer::Cell],
+    font: &Handle<Font>,
+    font_size: f32,
+) {
     text.sections.clear();
     let mut current_color: Option<RColor> = None;
     let mut current_str = String::new();
@@ -207,23 +276,35 @@ fn fill_text_sections(text: &mut Text, cells: &[ratatui::buffer::Cell], font: &H
     for cell in cells {
         let fg = cell.style().fg.unwrap_or(RColor::Reset);
         if Some(fg) != current_color && !current_str.is_empty() {
-            push_section(text, &current_str, current_color.unwrap_or(RColor::Reset), font);
+            push_section(
+                text,
+                &current_str,
+                current_color.unwrap_or(RColor::Reset),
+                font,
+                font_size,
+            );
             current_str.clear();
         }
         current_color = Some(fg);
         current_str.push_str(cell.symbol());
     }
     if !current_str.is_empty() {
-        push_section(text, &current_str, current_color.unwrap_or(RColor::Reset), font);
+        push_section(
+            text,
+            &current_str,
+            current_color.unwrap_or(RColor::Reset),
+            font,
+            font_size,
+        );
     }
 }
 
-fn push_section(text: &mut Text, value: &str, color: RColor, font: &Handle<Font>) {
+fn push_section(text: &mut Text, value: &str, color: RColor, font: &Handle<Font>, font_size: f32) {
     text.sections.push(TextSection {
         value: value.to_string(),
         style: TextStyle {
             font: font.clone(),
-            font_size: FONT_SIZE,
+            font_size,
             color: ratatui_to_bevy_color(color),
         },
     });

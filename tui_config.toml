@@ -1,0 +1,5 @@
+mode = "SeparateWindow"
+window_width = 800.0
+window_height = 600.0
+window_x = 100.0
+window_y = 100.0

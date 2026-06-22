@@ -29,6 +29,7 @@ pub struct StartMenuKeymap {
     pub select_previous: Key,
     pub quit: Key,
     pub validate: Key,
+    pub toggle_tui_mode: Key,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -159,6 +160,7 @@ impl Default for StartMenuKeymap {
             select_previous: Key::from_str_unchecked("up"),
             quit: Key::from_str_unchecked("esc"),
             validate: Key::from_str_unchecked("space"),
+            toggle_tui_mode: Key::from_str_unchecked("tab"),
         }
     }
 }

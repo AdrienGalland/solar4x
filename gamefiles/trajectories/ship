@@ -24,6 +24,14 @@ nodes = [
 ], origin = "terre" },
 ],
     [
+    472,
+    { name = "Node", thrust = [
+    -22965.68452852105,
+    0.0,
+    0.0,
+], origin = "terre" },
+],
+    [
     1431,
     { name = "Node", thrust = [
     0.0,

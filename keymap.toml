@@ -32,6 +32,7 @@ select_next = "down"
 select_previous = "up"
 quit = "esc"
 validate = "space"
+toggle_tui_mode = "tab"
 
 [fleet_screen]
 select_next = "down"
