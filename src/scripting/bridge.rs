@@ -5,11 +5,75 @@ use crate::{
     game::Loaded,
     objects::{
         prelude::BodyInfo,
-        ships::{ShipID, ShipInfo, trajectory::VelocityUpdate},
+        ships::{config::{ShipComponents, ShipComponentsStore}, ShipID, ShipInfo, trajectory::VelocityUpdate},
     },
     physics::{prelude::{Position, ToggleTime}, time::TimeEvent},
     scripting::event_bus::{LuaEventBus, ScriptingSet},
 };
+
+// ── Component injection ───────────────────────────────────────────────────────
+
+/// Fired when a ship is loaded from a config file; calls `declare_components` in Lua.
+#[derive(Event)]
+pub struct InjectComponentsEvent {
+    pub ship_id: ShipID,
+    pub components: ShipComponents,
+}
+
+fn ship_components_to_lua(lua: &mlua::Lua, components: &ShipComponents) -> mlua::Result<mlua::Table> {
+    let config = lua.create_table()?;
+
+    let tanks = lua.create_table()?;
+    for (id, tank) in &components.tanks {
+        let t = lua.create_table()?;
+        t.set("capacite", tank.capacite)?;
+        t.set("carburant", tank.carburant)?;
+        tanks.set(id.as_str(), t)?;
+    }
+    config.set("tanks", tanks)?;
+
+    let thrusters = lua.create_table()?;
+    for (id, thr) in &components.thrusters {
+        let t = lua.create_table()?;
+        t.set("force_max", thr.force_max)?;
+        t.set("consommation", thr.consommation)?;
+        t.set("reservoir", thr.reservoir.as_str())?;
+        thrusters.set(id.as_str(), t)?;
+    }
+    config.set("thrusters", thrusters)?;
+
+    let sensors = lua.create_table()?;
+    for (id, sensor) in &components.sensors {
+        let t = lua.create_table()?;
+        t.set("portee", sensor.portee)?;
+        sensors.set(id.as_str(), t)?;
+    }
+    config.set("sensors", sensors)?;
+
+    Ok(config)
+}
+
+fn inject_components(
+    mut events: EventReader<InjectComponentsEvent>,
+    bus: NonSendMut<LuaEventBus>,
+    mut store: ResMut<ShipComponentsStore>,
+) {
+    for event in events.read() {
+        store.0.insert(event.ship_id, event.components.clone());
+        let Ok(declare_fn) = bus.lua.globals().get::<mlua::Function>("declare_components") else {
+            warn!("[scripting] declare_components not found in Lua globals");
+            continue;
+        };
+        match ship_components_to_lua(&bus.lua, &event.components) {
+            Ok(table) => {
+                if let Err(e) = declare_fn.call::<()>((event.ship_id.to_string(), table)) {
+                    warn!("[scripting] declare_components failed for {}: {e}", event.ship_id);
+                }
+            }
+            Err(e) => warn!("[scripting] Failed to build Lua component table: {e}"),
+        }
+    }
+}
 
 // ── ship_tick broadcast ───────────────────────────────────────────────────────
 
@@ -269,6 +333,72 @@ mod tests {
         let events = app.world().resource::<Events<VelocityUpdate>>();
         assert_eq!(events.len(), 0, "apply_thrust with missing fields should be silently ignored");
     }
+
+    fn setup_with_lib() -> App {
+        let mut app = setup();
+        const LIB: &str = include_str!("../scripts/events/_lib_composants.lua");
+        app.world_mut()
+            .non_send_resource_mut::<LuaEventBus>()
+            .load_script(LIB, "_lib_composants.lua")
+            .unwrap();
+        app.add_event::<InjectComponentsEvent>();
+        app.init_resource::<ShipComponentsStore>();
+        app.add_systems(Update, inject_components);
+        app
+    }
+
+    fn make_components() -> ShipComponents {
+        use crate::objects::ships::config::{SensorConfig, TankConfig, ThrusterConfig};
+        let mut c = ShipComponents::default();
+        c.tanks.insert("main".into(), TankConfig { capacite: 200.0, carburant: 150.0 });
+        c.thrusters.insert("motor".into(), ThrusterConfig { force_max: 5.0, consommation: 1.0, reservoir: "main".into() });
+        c.sensors.insert("radar".into(), SensorConfig { portee: 5000.0 });
+        c
+    }
+
+    #[test]
+    fn test_inject_components_updates_store() {
+        let mut app = setup_with_lib();
+        let ship_id = ShipID::from("shp").unwrap();
+        app.world_mut().send_event(InjectComponentsEvent { ship_id, components: make_components() });
+        app.update();
+
+        let store = app.world().resource::<ShipComponentsStore>();
+        assert!(store.0.contains_key(&ship_id), "store should contain the ship");
+        assert!(store.0[&ship_id].tanks.contains_key("main"));
+        assert!(store.0[&ship_id].thrusters.contains_key("motor"));
+        assert!(store.0[&ship_id].sensors.contains_key("radar"));
+    }
+
+    #[test]
+    fn test_inject_components_calls_lua_declare() {
+        let mut app = setup_with_lib();
+        let ship_id = ShipID::from("shp").unwrap();
+        app.world_mut().send_event(InjectComponentsEvent { ship_id, components: make_components() });
+        app.update();
+
+        let bus = app.world().non_send_resource::<LuaEventBus>();
+        let fuel: f64 = bus.lua
+            .load("return get_fuel('shp', 'main')")
+            .eval()
+            .unwrap_or(0.0);
+        assert_eq!(fuel, 150.0, "get_fuel should return carburant after declare_components");
+    }
+
+    #[test]
+    fn test_inject_components_no_declare_fn_is_silent() {
+        // Without the lib loaded, declare_components doesn't exist; should not panic.
+        let mut app = setup();
+        app.add_event::<InjectComponentsEvent>();
+        app.init_resource::<ShipComponentsStore>();
+        app.add_systems(Update, inject_components);
+        let ship_id = ShipID::from("shp").unwrap();
+        app.world_mut().send_event(InjectComponentsEvent { ship_id, components: make_components() });
+        app.update(); // must not panic
+        // Store should still be updated
+        let store = app.world().resource::<ShipComponentsStore>();
+        assert!(store.0.contains_key(&ship_id));
+    }
 }
 
 // ── Plugin ────────────────────────────────────────────────────────────────────
@@ -277,7 +407,9 @@ pub struct BridgePlugin;
 
 impl Plugin for BridgePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(Loaded), load_event_scripts)
+        app.init_resource::<ShipComponentsStore>()
+            .add_event::<InjectComponentsEvent>()
+            .add_systems(OnEnter(Loaded), load_event_scripts)
             .add_systems(
                 Update,
                 ship_tick_broadcast
@@ -290,6 +422,10 @@ impl Plugin for BridgePlugin {
                 lua_to_bevy_bridge
                     .in_set(ScriptingSet::BridgeEvents)
                     .run_if(in_state(Loaded)),
+            )
+            .add_systems(
+                Update,
+                inject_components.run_if(in_state(Loaded)),
             );
     }
 }

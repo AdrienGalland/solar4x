@@ -15,6 +15,7 @@ pub struct Keymap {
     pub start_menu: StartMenuKeymap,
     pub fleet_screen: FleetScreenKeymap,
     pub editor: EditorKeymap,
+    pub components: ComponentsKeymap,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
@@ -39,6 +40,8 @@ pub struct FleetScreenKeymap {
     pub back: Key,
     pub edit_trajectory: Key,
     pub new_ship: Key,
+    pub load_ship: Key,
+    pub edit_components: Key,
     pub cycle_options: Key,
     pub cycle_options_back: Key,
     pub validate_new_ship: Key,
@@ -46,6 +49,20 @@ pub struct FleetScreenKeymap {
     pub enter_explorer: Key,
     pub run_time: Key,
     pub pause_time: Key,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ComponentsKeymap {
+    pub select_next: Key,
+    pub select_previous: Key,
+    pub add_component: Key,
+    pub delete_component: Key,
+    pub save: Key,
+    pub back: Key,
+    pub validate: Key,
+    pub cycle_options: Key,
+    pub cycle_options_back: Key,
+    pub delete_char: Key,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -173,6 +190,8 @@ impl Default for FleetScreenKeymap {
             back: Key::from_str_unchecked("esc"),
             edit_trajectory: Key::from_str_unchecked("space"),
             new_ship: Key::from_str_unchecked("n"),
+            load_ship: Key::from_str_unchecked("l"),
+            edit_components: Key::from_str_unchecked("c"),
             cycle_options: Key::from_str_unchecked("tab"),
             cycle_options_back: Key::from_str_unchecked("S backtab"),
             validate_new_ship: Key::from_str_unchecked("enter"),
@@ -180,6 +199,23 @@ impl Default for FleetScreenKeymap {
             enter_explorer: Key::from_str_unchecked("e"),
             run_time: Key::from_str_unchecked("r"),
             pause_time: Key::from_str_unchecked("p"),
+        }
+    }
+}
+
+impl Default for ComponentsKeymap {
+    fn default() -> Self {
+        Self {
+            select_next: Key::from_str_unchecked("down"),
+            select_previous: Key::from_str_unchecked("up"),
+            add_component: Key::from_str_unchecked("a"),
+            delete_component: Key::from_str_unchecked("d"),
+            save: Key::from_str_unchecked("s"),
+            back: Key::from_str_unchecked("esc"),
+            validate: Key::from_str_unchecked("enter"),
+            cycle_options: Key::from_str_unchecked("tab"),
+            cycle_options_back: Key::from_str_unchecked("S backtab"),
+            delete_char: Key::from_str_unchecked("backspace"),
         }
     }
 }

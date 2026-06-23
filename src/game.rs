@@ -11,7 +11,7 @@ use crate::{
     objects::{
         bodies::BodiesPlugin,
         prelude::BodiesMapping,
-        ships::{trajectory::TRAJECTORIES_PATH, ShipsMapping, ShipsPlugin},
+        ships::{config::SHIPS_PATH, trajectory::TRAJECTORIES_PATH, ShipsMapping, ShipsPlugin},
         ObjectsUpdate,
     },
     physics::{
@@ -86,15 +86,17 @@ impl Default for TempDirectory {
 pub struct GameFiles {
     pub root: PathBuf,
     pub trajectories: PathBuf,
+    pub ships: PathBuf,
 }
 
 impl GameFiles {
     pub fn new(path: impl AsRef<Path>) -> Result<Self, std::io::Error> {
         let root: PathBuf = path.as_ref().into();
-        let trajectories = root.join(TRAJECTORIES_PATH);
-        create_dir_all(trajectories)?;
+        create_dir_all(root.join(TRAJECTORIES_PATH))?;
+        create_dir_all(root.join(SHIPS_PATH))?;
         Ok(Self {
             trajectories: root.join(TRAJECTORIES_PATH),
+            ships: root.join(SHIPS_PATH),
             root,
         })
     }

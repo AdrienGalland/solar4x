@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use bevy_ratatui::event::KeyEvent;
+use components::{ComponentsContext, ComponentsScreen};
 use editor::{EditorContext, EditorScreen};
 use explorer::{ExplorerContext, ExplorerScreen};
 use fleet::{FleetContext, FleetPopup, FleetScreen};
@@ -16,6 +17,7 @@ use crate::{
 
 use super::{widget::space_map::SpaceMap, InputReading, RenderSet};
 
+pub mod components;
 pub mod editor;
 pub mod explorer;
 pub mod fleet;
@@ -33,6 +35,7 @@ pub enum AppScreen {
     Fleet,
     Editor(ShipID),
     Scheduler(ShipID),
+    Components(ShipID),
 }
 
 #[derive(Resource, Default, Debug)]
@@ -44,6 +47,7 @@ pub fn plugin(app: &mut App) {
         explorer::plugin,
         fleet::plugin,
         editor::plugin,
+        components::plugin,
     ))
     .init_state::<AppScreen>()
     .init_resource::<PreviousScreen>()
@@ -114,6 +118,7 @@ fn render(
     mut explorer: Option<ResMut<ExplorerContext>>,
     mut fleet: Option<ResMut<FleetContext>>,
     mut editor: Option<ResMut<EditorContext>>,
+    mut components_ctx: Option<ResMut<ComponentsContext>>,
     mut space_map: Option<ResMut<SpaceMap>>,
     tui_settings: Option<Res<TuiWindowSettings>>,
 ) -> color_eyre::Result<()> {
@@ -146,6 +151,11 @@ fn render(
             AppScreen::Editor(_) => {
                 if let Some(ed) = editor.as_deref_mut() {
                     f.render_stateful_widget(EditorScreen, full_area, ed);
+                }
+            }
+            AppScreen::Components(_) => {
+                if let Some(cmp) = components_ctx.as_deref_mut() {
+                    f.render_stateful_widget(ComponentsScreen, full_area, cmp);
                 }
             }
             AppScreen::Scheduler(_) => {}

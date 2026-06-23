@@ -18,6 +18,7 @@ use super::id::MAX_ID_LENGTH;
 use super::prelude::{BodiesMapping, BodyInfo, PrimaryBody};
 use super::ObjectsUpdate;
 
+pub mod config;
 pub mod trajectory;
 pub mod scheduler;
 
