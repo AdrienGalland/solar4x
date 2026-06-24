@@ -7,20 +7,30 @@
 -- Etat par vaisseau : nil = premier tick (pas encore de référence), true/false ensuite
 local etait_proche = {}
 
+local _log_tick = {}  -- DEBUG: limite les logs à 1 par seconde par vaisseau
+
 on("ship_tick", function(data)
     local d = data.bodies["terre"]
     if d == nil then return end
 
     -- Seuil dynamique : portée du capteur le plus puissant du vaisseau
     local seuil = get_max_sensor_range(data.ship_id)
+
+    -- DEBUG: affiche distance + seuil toutes les 60 ticks environ
+    _log_tick[data.ship_id] = (_log_tick[data.ship_id] or 0) + 1
+    if _log_tick[data.ship_id] % 60 == 1 then
+        print("[proximite_terre] " .. data.ship_id
+              .. " dist_terre=" .. string.format("%.0f", d) .. " km"
+              .. "  seuil=" .. seuil .. " km")
+    end
+
     if seuil == 0 then return end  -- pas de capteur déclaré pour ce vaisseau
 
     local actuel    = d < seuil
     local precedent = etait_proche[data.ship_id]
 
-    -- Franchissement du seuil : était loin (false), maintenant proche (true)
-    -- precedent == nil au démarrage → condition fausse → pas de pause si déjà proche
     if precedent == false and actuel then
+        print("[proximite_terre] PAUSE déclenché pour " .. data.ship_id)
         fire("pause_game", {})
     end
 

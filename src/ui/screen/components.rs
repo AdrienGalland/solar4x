@@ -18,6 +18,7 @@ use crate::{
         ShipID, ShipInfo,
     },
     prelude::*,
+    scripting::bridge::InjectComponentsEvent,
     ui::UiUpdate,
 };
 
@@ -301,6 +302,7 @@ fn handle_events(
     mut next_screen: ResMut<NextState<AppScreen>>,
     mut events: EventReader<ComponentsScreenEvent>,
     mut store: ResMut<ShipComponentsStore>,
+    mut inject_events: EventWriter<InjectComponentsEvent>,
     game_files: Res<GameFiles>,
     ships: Query<&ShipInfo>,
 ) {
@@ -335,7 +337,13 @@ fn handle_events(
                     trajectory,
                 };
                 ctx.save_status = Some(match save_ship_config(&game_files.ships, &config) {
-                    Ok(()) => format!("Saved to gamefiles/ships/{}.json", ctx.ship_id),
+                    Ok(()) => {
+                        inject_events.send(InjectComponentsEvent {
+                            ship_id: ctx.ship_id,
+                            components: ctx.components.clone(),
+                        });
+                        format!("Saved to gamefiles/ships/{}.json", ctx.ship_id)
+                    }
                     Err(e) => format!("Save failed: {e}"),
                 });
             }

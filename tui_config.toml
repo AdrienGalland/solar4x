@@ -1,4 +1,4 @@
-mode = "SeparateWindow"
+mode = "Integrated"
 window_width = 800.0
 window_height = 600.0
 window_x = 100.0
