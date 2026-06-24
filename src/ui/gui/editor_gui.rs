@@ -26,7 +26,7 @@ use bevy::{
     window::PrimaryWindow,
 };
 
-use super::{AdaptiveTranslation, SelectObjectEvent, MAX_HEIGHT};
+use super::{draw_all_ships_predictions, draw_gizmos, AdaptiveTranslation, SelectObjectEvent, MAX_HEIGHT};
 
 const GIZMO_COLORS: [Color; 6] = [
     Color::Srgba(RED),
@@ -43,6 +43,8 @@ pub fn plugin(app: &mut App) {
             PostUpdate,
             (draw_predictions, draw_maneuver_node)
                 .in_set(RenderSet)
+                .after(draw_all_ships_predictions)
+                .after(draw_gizmos)
                 .run_if(resource_exists::<EditorContext>),
         )
         .add_systems(
@@ -105,11 +107,10 @@ fn draw_predictions(
             continue;
         }
         let color = if temp.is_some() {
-            Color::Srgba(ORANGE)
+            Color::Srgba(ORANGE).with_alpha(0.5)
         } else {
-            Color::WHITE
-        }
-        .with_alpha(0.2);
+            Color::Srgba(BLUE).with_alpha(0.8)
+        };
         gizmos.circle_2d(
             t.translation.xy(),
             (1. - p.index as f32 / predictions_number.0 as f32) * MAX_HEIGHT
