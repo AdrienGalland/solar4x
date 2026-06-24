@@ -47,11 +47,51 @@ pub fn plugin(app: &mut App) {
                 )
                 .in_set(UiUpdate),
         )
-        .add_systems(OnEnter(InGame), create_screen)
+        .add_systems(OnEnter(InGame), (create_screen, create_fleet_space_map).chain())
         .add_systems(
             OnExit(InGame),
-            clear_screen.run_if(not(in_state(AppScreen::Fleet))),
+            (
+                clear_screen.run_if(not(in_state(AppScreen::Fleet))),
+                |mut commands: Commands| commands.remove_resource::<SpaceMap>(),
+            ),
+        )
+        .add_systems(
+            OnEnter(AppScreen::Fleet),
+            create_fleet_space_map.run_if(in_state(Loaded)),
+        )
+        .add_systems(
+            Update,
+            handle_fleet_focus
+                .run_if(in_loaded_screen::<FleetContext>(AppScreen::Fleet))
+                .run_if(on_event::<SelectObjectEvent>())
+                .run_if(resource_exists::<SpaceMap>),
         );
+}
+
+fn create_fleet_space_map(
+    mut commands: Commands,
+    system_size: Res<SystemSize>,
+    primary: Query<Entity, With<PrimaryBody>>,
+    bodies_mapping: Res<BodiesMapping>,
+    bodies: Query<(&BodyInfo, &OrbitingObjects)>,
+) {
+    let primary_entity = primary.get_single().ok();
+    let mut map = SpaceMap::new(system_size.0, primary_entity, primary_entity);
+    map.autoscale(&bodies_mapping.0, &bodies);
+    commands.insert_resource(map);
+}
+
+fn handle_fleet_focus(
+    mut events: EventReader<SelectObjectEvent>,
+    bodies: Query<&BodyInfo>,
+    mut space_map: ResMut<SpaceMap>,
+) {
+    for event in events.read() {
+        if bodies.get(event.entity).is_ok() {
+            space_map.focus(event.entity);
+            space_map.selected = Some(event.entity);
+        }
+    }
 }
 
 fn create_screen(

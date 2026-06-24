@@ -13,13 +13,24 @@ use bevy::{
 };
 
 use crate::{
+    game::GameFiles,
     objects::{
         orbiting_obj::{OrbitalObjID, OrbitingObjects},
+        ships::trajectory::read_ship_trajectory,
         // ships::HostBody,
-    }, physics::{influence::HillRadius, orbit::SystemSize}, prelude::*, utils::{
+    },
+    physics::{
+        influence::HillRadius,
+        orbit::SystemSize,
+        predictions::PredictionStart,
+        time::SIMTICKS_PER_TICK,
+    },
+    prelude::*,
+    ui::screen::editor::{editor_backend::NumberOfPredictions, EditorContext},
+    utils::{
         algebra::{center_to_periapsis_direction, ellipse_half_sizes},
         ui::EllipseBuilder,
-    }
+    },
 };
 
 use self::editor_gui::CurrentGizmo;
@@ -73,6 +84,7 @@ impl Plugin for GuiPlugin {
                         .chain()
                         .in_set(UiUpdate),
                     draw_gizmos.in_set(RenderSet),
+                    draw_all_ships_predictions.in_set(RenderSet),
                     (debug_print, draw_selection_spheres).run_if(resource_exists::<DebugDisplay>),
                 )
                     .run_if(resource_exists::<SpaceMap>)
@@ -302,7 +314,8 @@ fn update_camera_pos(
     };
     let focus_pos = space_map
         .focus_body
-        .map_or(DVec3::default(), |f| positions.get(f).unwrap().0);
+        .and_then(|f| positions.get(f).ok())
+        .map_or(DVec3::default(), |p| p.0);
     cam_pos.translation = ((focus_pos
         + DVec3::new(space_map.offset_amount.x, space_map.offset_amount.y, 0.))
         * scale)
@@ -322,7 +335,7 @@ fn update_transform(system_size: Res<SystemSize>, mut query: Query<(&mut Transfo
 
 #[allow(non_snake_case)]
 #[allow(clippy::too_many_arguments)]
-fn draw_gizmos(
+pub fn draw_gizmos(
     space_map: Res<SpaceMap>,
     mut gizmos: Gizmos,
     bodies: Query<(
@@ -340,12 +353,27 @@ fn draw_gizmos(
     ships_mapping: Res<ShipsMapping>,
 ) {
     let scale = MAX_HEIGHT as f64 / space_map.system_size;
-    if let &SpaceMap {
-        zoom_level,
-        selected: Some(s),
-        ..
-    } = space_map.as_ref()
-    {
+    let zoom_level = space_map.zoom_level;
+
+    // Display ships (always, regardless of selection)
+    for (t, speed, influence) in ships.iter() {
+        let ref_speed = influence
+            .main_influencer
+            .and_then(|e| bodies.get(e).ok())
+            .map_or(DVec3::ZERO, |(_, v, ..)| v.0);
+        let speed = ((speed.0 - ref_speed).normalize_or(DVec3::X) * MAX_HEIGHT as f64
+            / (30. * zoom_level))
+            .xy()
+            .as_vec2();
+        let t = t.translation.xy() - speed / 3.;
+        let perp = speed.perp() / 3.;
+        gizmos.linestrip_2d(
+            [t + speed, t + perp, t - perp, t + speed],
+            Color::Srgba(GOLD),
+        );
+    }
+
+    if let Some(s) = space_map.selected {
         if let Ok((pos, _, info, orbiting_obj, _)) = bodies.get(s) {
             // Display selection circle
             gizmos.circle_2d(
@@ -377,7 +405,7 @@ fn draw_gizmos(
                     eccentric_anomaly: E,
                     revolution_period,
                     ..
-                }) = orbit_query.get(obj) 
+                }) = orbit_query.get(obj)
                 {
                     let (o, O, I, E) = (
                     o.to_radians(),
@@ -386,19 +414,11 @@ fn draw_gizmos(
                     E.to_radians(),
                     );
                     let peri = (1. - e) * a;
-                    // if let Some(radius) = viewable_radius(cam) {
-                    //     let distance_to_parent = (cam_pos.translation() - parent_translation).length();
-                    //     if distance_to_parent + radius < (peri * scale) as f32
-                    //         || distance_to_parent - radius > (apo * scale) as f32
-                    //     {
-                    //         continue;
-                    //     }
-                    // }
                     let position =
                         (scale * (peri - a) * center_to_periapsis_direction(o, O, I).normalize())
                             .as_vec3()
                             + parent_translation;
-                        
+
                     let resolution = ((zoom_level * 100.) as usize).min(1000);
                     EllipseBuilder {
                         position,
@@ -412,7 +432,7 @@ fn draw_gizmos(
                         sign: -revolution_period.signum() as f32,
                     }
                     .draw(&mut gizmos);
-                }       
+                }
             }
             // Display sphere of influence
             for (pos, radius) in influence_query.iter() {
@@ -420,37 +440,6 @@ fn draw_gizmos(
                     pos.translation.xy(),
                     (radius.0 * scale) as f32,
                     Color::srgba(1., 0.1, 0.1, 0.1),
-                );
-            }
-            // // Display orbital ships
-            // for (transform, speed, _, HostBody(host_body_id)) in orbital_ships.iter() {
-            //     let host_body = bodies_mapping.0.get(host_body_id).unwrap();
-            //     let ref_speed = bodies.get(*host_body).unwrap().1 .0;
-            //     let speed = ((speed.0 - ref_speed).normalize_or(DVec3::X) * MAX_HEIGHT as f64 
-            //         / (30. * zoom_level))
-            //         .xy()
-            //         .as_vec2();
-            //     let t = transform.translation.xy() - speed / 3.;
-            //     let perp = speed.perp() / 3.;
-            //     gizmos.linestrip_2d(
-            //         [t + speed, t + perp, t - perp, t + speed],
-            //         Color::Srgba(RED),
-            //     );
-            // }
-            // Display ships
-            for (t, speed, influence) in ships.iter() {
-                let ref_speed = influence
-                    .main_influencer
-                    .map_or(DVec3::ZERO, |e| bodies.get(e).unwrap().1 .0);
-                let speed = ((speed.0 - ref_speed).normalize_or(DVec3::X) * MAX_HEIGHT as f64
-                    / (30. * zoom_level))
-                    .xy()
-                    .as_vec2();
-                let t = t.translation.xy() - speed / 3.;
-                let perp = speed.perp() / 3.;
-                gizmos.linestrip_2d(
-                    [t + speed, t + perp, t - perp, t + speed],
-                    Color::Srgba(GOLD),
                 );
             }
         }
@@ -480,4 +469,62 @@ fn draw_selection_spheres(
             GREEN,
         );
     });
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn draw_all_ships_predictions(
+    mut gizmos: Gizmos,
+    ships: Query<(Entity, &Acceleration, &Influenced, &Position, &Velocity, &ShipInfo)>,
+    mut bodies: Query<(&EllipticalOrbit, &BodyInfo, &HillRadius)>,
+    orbiting: Query<&OrbitingObjects>,
+    bodies_mapping: Res<BodiesMapping>,
+    space_map: Res<SpaceMap>,
+    time: Res<GameTime>,
+    predictions_number: Res<NumberOfPredictions>,
+    editor_ctx: Option<Res<EditorContext>>,
+    gamefiles: Option<Res<GameFiles>>,
+) {
+    let scale = MAX_HEIGHT as f64 / space_map.system_size;
+    let edited_ship = editor_ctx.as_ref().map(|c| c.ship);
+    let reference = space_map.focus_body;
+    let color = Color::srgba(0.6, 0.6, 0.6, 0.2);
+    let count = predictions_number.0;
+
+    for (entity, acc, influence, pos, vel, info) in ships.iter() {
+        if Some(entity) == edited_ship {
+            continue;
+        }
+
+        let nodes = gamefiles
+            .as_ref()
+            .and_then(|gf| read_ship_trajectory(&gf.trajectories, info.id).ok())
+            .map(|t| t.nodes)
+            .unwrap_or_default();
+
+        let predictions = PredictionStart {
+            pos: pos.0,
+            speed: vel.0,
+            simtick: time.simtick,
+            acc: acc.current,
+        }
+        .compute_predictions(
+            count,
+            influence,
+            reference,
+            &mut bodies.as_query_lens(),
+            &orbiting,
+            &bodies_mapping.0,
+            &nodes,
+        );
+
+        for (i, (pred_pos, _)) in predictions.iter().enumerate() {
+            if i % SIMTICKS_PER_TICK as usize != 0 {
+                continue;
+            }
+            let radius = (1. - i as f32 / count as f32)
+                * MAX_HEIGHT
+                / (500. * space_map.zoom_level as f32);
+            gizmos.circle_2d((*pred_pos * scale).as_vec3().xy(), radius, color);
+        }
+    }
 }
