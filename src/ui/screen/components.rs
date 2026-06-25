@@ -636,6 +636,7 @@ mod tests {
         app.add_plugins((MinimalPlugins, StatesPlugin));
         app.init_state::<AppScreen>();
         app.init_resource::<ShipComponentsStore>();
+        app.add_systems(Update, (persist_components, create_screen));
         app
     }
 
@@ -647,7 +648,6 @@ mod tests {
         components.sensors.insert("radar".into(), SensorConfig { portee: 5000.0 });
         app.insert_resource(ComponentsContext::new(ship_id, components));
 
-        app.add_systems(Update, persist_components);
         app.update();
 
         let store = app.world().resource::<ShipComponentsStore>();
@@ -660,7 +660,6 @@ mod tests {
         let mut app = setup_app_for_components();
         let ship_id = ShipID::from("shp").unwrap();
 
-        // Pre-populate store
         {
             let mut store = app.world_mut().resource_mut::<ShipComponentsStore>();
             let mut components = ShipComponents::default();
@@ -668,10 +667,8 @@ mod tests {
             store.0.insert(ship_id, components);
         }
 
-        // Set state to Components(ship_id)
+        // StateTransition runs before Update, so create_screen sees the new state in the same update.
         app.world_mut().resource_mut::<NextState<AppScreen>>().set(AppScreen::Components(ship_id));
-        app.update(); // transition
-        app.add_systems(Update, create_screen);
         app.update();
 
         let ctx = app.world().get_resource::<ComponentsContext>().expect("ComponentsContext should exist");
@@ -685,8 +682,6 @@ mod tests {
         let ship_id = ShipID::from("fresh").unwrap();
 
         app.world_mut().resource_mut::<NextState<AppScreen>>().set(AppScreen::Components(ship_id));
-        app.update();
-        app.add_systems(Update, create_screen);
         app.update();
 
         let ctx = app.world().get_resource::<ComponentsContext>().expect("ComponentsContext should exist");
