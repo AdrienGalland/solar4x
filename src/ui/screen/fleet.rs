@@ -14,6 +14,7 @@ use crate::{
     game::GameFiles,
     objects::{
         id::MAX_ID_LENGTH,
+        orbiting_obj::OrbitingObjects,
         ships::{
             config::{list_ship_configs, load_ship_config, ShipConfig},
             trajectory::TrajectoryEvent,
