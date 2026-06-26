@@ -79,6 +79,11 @@ impl CurrentTrajectory {
             queue: trajectory.nodes.into_iter().peekable(),
         }
     }
+
+    pub fn new_from_tick(mut trajectory: Trajectory, tick: u64) -> Self {
+        trajectory.nodes.retain(|t, _| *t >= tick);
+        Self::new(trajectory)
+    }
 }
 
 #[derive(Event, Debug, Clone, PartialEq)]
@@ -259,32 +264,53 @@ pub fn remove_old_nodes(dir: Res<GameFiles>, time: Res<GameTime>) {
 pub fn handle_trajectory_event(
     mut reader: EventReader<TrajectoryEvent>,
     dir: Res<GameFiles>,
+    time: Res<GameTime>,
+    mapping: Option<Res<ShipsMapping>>,
+    mut commands: Commands,
 ) -> color_eyre::Result<()> {
     use TrajectoryEvent::*;
     for event in reader.read() {
-        let path = build_path(
-            &dir.trajectories,
-            *match event {
-                Create { ship, .. } => ship,
-                Delete(s) => s,
-                AddNode { ship, .. } => ship,
-                RemoveNode { ship, .. } => ship,
-            },
-        );
+        let ship = *match event {
+            Create { ship, .. } => ship,
+            Delete(s) => s,
+            AddNode { ship, .. } => ship,
+            RemoveNode { ship, .. } => ship,
+        };
+        let path = build_path(&dir.trajectories, ship);
         match event {
             Create { trajectory, .. } => {
                 write_trajectory(path, trajectory)?;
+                if let Some(entity) = mapping.as_ref().and_then(|mapping| mapping.0.get(&ship)) {
+                    commands
+                        .entity(*entity)
+                        .insert(CurrentTrajectory::new_from_tick(trajectory.clone(), time.tick()));
+                }
             }
-            Delete(_) => remove_file(path).unwrap_or_default(),
+            Delete(_) => {
+                remove_file(path).unwrap_or_default();
+                if let Some(entity) = mapping.as_ref().and_then(|mapping| mapping.0.get(&ship)) {
+                    commands.entity(*entity).remove::<CurrentTrajectory>();
+                }
+            }
             AddNode { node, tick, .. } => {
                 let mut t = read_trajectory(&path).unwrap_or_default();
                 t.nodes.insert(*tick, node.clone());
                 write_trajectory(path, &t)?;
+                if let Some(entity) = mapping.as_ref().and_then(|mapping| mapping.0.get(&ship)) {
+                    commands
+                        .entity(*entity)
+                        .insert(CurrentTrajectory::new_from_tick(t, time.tick()));
+                }
             }
             RemoveNode { tick, .. } => {
                 let mut t = read_trajectory(&path)?;
                 t.nodes.remove(tick);
                 write_trajectory(path, &t)?;
+                if let Some(entity) = mapping.as_ref().and_then(|mapping| mapping.0.get(&ship)) {
+                    commands
+                        .entity(*entity)
+                        .insert(CurrentTrajectory::new_from_tick(t, time.tick()));
+                }
             }
         }
     }

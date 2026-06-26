@@ -71,6 +71,12 @@ impl Plugin for ClientPlugin {
             start_connection.pipe(exit_on_error_if_app),
         )
         .add_systems(
+            OnEnter(ClientMode::Singleplayer),
+            |mut time: ResMut<GameTime>| {
+                time.simtick = 0;
+            },
+        )
+        .add_systems(
             OnEnter(ClientMode::Explorer),
             move |mut toggle: ResMut<ToggleTime>, mut time: ResMut<GameTime>| {
                 toggle.0 = true;

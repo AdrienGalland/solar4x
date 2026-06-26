@@ -1,9 +1,13 @@
 use bevy::prelude::*;
-use bevy_ratatui::{event::KeyEvent, terminal::RatatuiContext};
+use bevy_ratatui::event::KeyEvent;
+use components::{ComponentsContext, ComponentsScreen};
 use editor::{EditorContext, EditorScreen};
 use explorer::{ExplorerContext, ExplorerScreen};
-use fleet::{FleetContext, FleetScreen};
+use fleet::{FleetContext, FleetPopup, FleetScreen};
 use start::{StartMenu, StartMenuContext};
+
+use crate::ui::tui_config::{TuiWindowMode, TuiWindowSettings};
+use crate::ui::tui_overlay::{PopupOverlayMarker, PopupTuiContext, TuiContext};
 
 use crate::{
     client::ClientMode,
@@ -13,6 +17,7 @@ use crate::{
 
 use super::{widget::space_map::SpaceMap, InputReading, RenderSet};
 
+pub mod components;
 pub mod editor;
 pub mod explorer;
 pub mod fleet;
@@ -30,6 +35,7 @@ pub enum AppScreen {
     Fleet,
     Editor(ShipID),
     Scheduler(ShipID),
+    Components(ShipID),
 }
 
 #[derive(Resource, Default, Debug)]
@@ -41,6 +47,7 @@ pub fn plugin(app: &mut App) {
         explorer::plugin,
         fleet::plugin,
         editor::plugin,
+        components::plugin,
     ))
     .init_state::<AppScreen>()
     .init_resource::<PreviousScreen>()
@@ -63,10 +70,14 @@ pub fn plugin(app: &mut App) {
         move |mut next_screen: ResMut<NextState<AppScreen>>| next_screen.set(AppScreen::Fleet),
     )
     .add_systems(
+        Update,
+        toggle_popup_visibility.run_if(resource_exists::<TuiContext>),
+    )
+    .add_systems(
         PostUpdate,
         render
             .pipe(exit_on_error_if_app)
-            .run_if(resource_exists::<RatatuiContext>)
+            .run_if(resource_exists::<TuiContext>)
             .in_set(RenderSet),
     );
 }
@@ -85,38 +96,82 @@ fn clear_key_events(mut events: ResMut<Events<KeyEvent>>) {
     events.clear();
 }
 
+fn toggle_popup_visibility(
+    fleet: Option<Res<FleetContext>>,
+    mut query: Query<&mut Visibility, With<PopupOverlayMarker>>,
+) {
+    let has_popup = fleet.as_deref().map(|f| f.has_popup()).unwrap_or(false);
+    for mut vis in query.iter_mut() {
+        *vis = if has_popup {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
+    }
+}
+
 fn render(
-    mut ctx: ResMut<RatatuiContext>,
+    mut ctx: ResMut<TuiContext>,
+    mut popup_ctx: Option<ResMut<PopupTuiContext>>,
     screen: Res<State<AppScreen>>,
-    start_menu: Option<ResMut<StartMenuContext>>,
-    explorer: Option<ResMut<ExplorerContext>>,
-    fleet: Option<ResMut<FleetContext>>,
-    editor: Option<ResMut<EditorContext>>,
-    space_map: Option<ResMut<SpaceMap>>,
+    mut start_menu: Option<ResMut<StartMenuContext>>,
+    mut explorer: Option<ResMut<ExplorerContext>>,
+    mut fleet: Option<ResMut<FleetContext>>,
+    mut editor: Option<ResMut<EditorContext>>,
+    mut components_ctx: Option<ResMut<ComponentsContext>>,
+    mut space_map: Option<ResMut<SpaceMap>>,
+    tui_settings: Option<Res<TuiWindowSettings>>,
 ) -> color_eyre::Result<()> {
-    ctx.draw(|f| match screen.get() {
-        AppScreen::StartMenu => {
-            f.render_stateful_widget(StartMenu, f.size(), start_menu.unwrap().as_mut())
-        }
-        AppScreen::Explorer => {
-            if let Some(mut explorer) = explorer {
-                f.render_stateful_widget(
-                    ExplorerScreen {
-                        map: space_map.unwrap().as_mut(),
-                    },
-                    f.size(),
-                    explorer.as_mut(),
-                )
+    let fleet_has_popup = fleet.as_deref().map(|f| f.has_popup()).unwrap_or(false);
+
+    ctx.0.draw(|f| {
+        let full_area = f.size();
+        match screen.get() {
+            AppScreen::StartMenu => {
+                if let Some(sm) = start_menu.as_deref_mut() {
+                    let tui_mode = tui_settings
+                        .as_deref()
+                        .map(|s| s.get_mode())
+                        .unwrap_or(TuiWindowMode::Integrated);
+                    f.render_stateful_widget(StartMenu { tui_mode }, full_area, sm);
+                }
             }
+            AppScreen::Explorer => {
+                if let (Some(exp), Some(map)) =
+                    (explorer.as_deref_mut(), space_map.as_deref_mut())
+                {
+                    f.render_stateful_widget(ExplorerScreen { map }, full_area, exp);
+                }
+            }
+            AppScreen::Fleet => {
+                if let Some(fl) = fleet.as_deref_mut() {
+                    f.render_stateful_widget(FleetScreen, full_area, fl);
+                }
+            }
+            AppScreen::Editor(_) => {
+                if let Some(ed) = editor.as_deref_mut() {
+                    f.render_stateful_widget(EditorScreen, full_area, ed);
+                }
+            }
+            AppScreen::Components(_) => {
+                if let Some(cmp) = components_ctx.as_deref_mut() {
+                    f.render_stateful_widget(ComponentsScreen, full_area, cmp);
+                }
+            }
+            AppScreen::Scheduler(_) => {}
         }
-        AppScreen::Fleet => {
-            f.render_stateful_widget(FleetScreen, f.size(), fleet.unwrap().as_mut())
-        }
-        AppScreen::Editor(_) => {
-            f.render_stateful_widget(EditorScreen, f.size(), editor.unwrap().as_mut())
-        }
-        AppScreen::Scheduler(_) => {} // A REMPLIR UNE FOIS L'UI FAITE
     })?;
+
+    // Render popup into its own buffer (displayed as a separate centered Bevy overlay).
+    if fleet_has_popup {
+        if let (Some(fl), Some(popup)) = (fleet.as_deref_mut(), popup_ctx.as_mut()) {
+            popup.0.draw(|f| {
+                let area = f.size();
+                f.render_stateful_widget(FleetPopup, area, fl);
+            })?;
+        }
+    }
+
     Ok(())
 }
 

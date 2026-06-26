@@ -72,6 +72,10 @@ pub enum TimeEvent {
     /// This does not change simulation outcome, but leads to heavier CPU load.
     ChangeUpdateRate(Direction2),
     ToggleTime,
+    /// Force the simulation to start.
+    StartTime,
+    /// Force the simulation to pause.
+    PauseTime,
 }
 
 fn update_tick(mut writer: EventWriter<TickEvent>, game_time: Res<GameTime>) {
@@ -105,6 +109,8 @@ fn handle_time_events(
                 Direction2::Down => step_size.0 /= 2,
             },
             ToggleTime => toggle_time.0 = !toggle_time.0,
+            StartTime => toggle_time.0 = true,
+            PauseTime => toggle_time.0 = false,
         }
     }
 }

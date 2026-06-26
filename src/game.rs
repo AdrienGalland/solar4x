@@ -11,13 +11,14 @@ use crate::{
     objects::{
         bodies::BodiesPlugin,
         prelude::BodiesMapping,
-        ships::{trajectory::TRAJECTORIES_PATH, ShipsMapping, ShipsPlugin},
+        ships::{config::SHIPS_PATH, trajectory::TRAJECTORIES_PATH, ShipsMapping, ShipsPlugin},
         ObjectsUpdate,
     },
     physics::{
         influence::InfluenceUpdate, orbit::OrbitsUpdate, prelude::ToggleTime, PhysicsPlugin,
         PhysicsUpdate,
     },
+    scripting::ScriptingPlugin,
     ui::gui::GUIUpdate,
 };
 
@@ -54,7 +55,7 @@ impl Plugin for GamePlugin {
         } else {
             app.add_plugins(DefaultPlugins)
         }
-        .add_plugins((PhysicsPlugin, BodiesPlugin, ShipsPlugin))
+        .add_plugins((PhysicsPlugin, BodiesPlugin, ShipsPlugin, ScriptingPlugin))
         .add_computed_state::<InGame>()
         .add_computed_state::<Authoritative>()
         .add_sub_state::<GameStage>()
@@ -85,15 +86,17 @@ impl Default for TempDirectory {
 pub struct GameFiles {
     pub root: PathBuf,
     pub trajectories: PathBuf,
+    pub ships: PathBuf,
 }
 
 impl GameFiles {
     pub fn new(path: impl AsRef<Path>) -> Result<Self, std::io::Error> {
         let root: PathBuf = path.as_ref().into();
-        let trajectories = root.join(TRAJECTORIES_PATH);
-        create_dir_all(trajectories)?;
+        create_dir_all(root.join(TRAJECTORIES_PATH))?;
+        create_dir_all(root.join(SHIPS_PATH))?;
         Ok(Self {
             trajectories: root.join(TRAJECTORIES_PATH),
+            ships: root.join(SHIPS_PATH),
             root,
         })
     }

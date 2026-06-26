@@ -1,0 +1,12 @@
+C:\Users\Julien\Documents\Stages\Stage rust\Code_github\solar4x\target_codex\debug\deps\rcgen-72aa63af93e354ab.d: C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\rcgen-0.12.1\src\lib.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\rcgen-0.12.1\src\crl.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\rcgen-0.12.1\src\csr.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\rcgen-0.12.1\src\error.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\rcgen-0.12.1\src\key_pair.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\rcgen-0.12.1\src\oid.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\rcgen-0.12.1\src\ring_like.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\rcgen-0.12.1\src\sign_algo.rs
+
+C:\Users\Julien\Documents\Stages\Stage rust\Code_github\solar4x\target_codex\debug\deps\librcgen-72aa63af93e354ab.rmeta: C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\rcgen-0.12.1\src\lib.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\rcgen-0.12.1\src\crl.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\rcgen-0.12.1\src\csr.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\rcgen-0.12.1\src\error.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\rcgen-0.12.1\src\key_pair.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\rcgen-0.12.1\src\oid.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\rcgen-0.12.1\src\ring_like.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\rcgen-0.12.1\src\sign_algo.rs
+
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\rcgen-0.12.1\src\lib.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\rcgen-0.12.1\src\crl.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\rcgen-0.12.1\src\csr.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\rcgen-0.12.1\src\error.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\rcgen-0.12.1\src\key_pair.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\rcgen-0.12.1\src\oid.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\rcgen-0.12.1\src\ring_like.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\rcgen-0.12.1\src\sign_algo.rs:

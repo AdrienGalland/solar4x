@@ -1,0 +1,10 @@
+C:\Users\Julien\Documents\Stages\Stage rust\Code_github\solar4x\target_codex\debug\deps\bevy_window-71af260c986a68b7.d: C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_window-0.14.0\src\lib.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_window-0.14.0\src\cursor.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_window-0.14.0\src\event.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_window-0.14.0\src\raw_handle.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_window-0.14.0\src\system.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_window-0.14.0\src\window.rs
+
+C:\Users\Julien\Documents\Stages\Stage rust\Code_github\solar4x\target_codex\debug\deps\libbevy_window-71af260c986a68b7.rmeta: C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_window-0.14.0\src\lib.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_window-0.14.0\src\cursor.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_window-0.14.0\src\event.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_window-0.14.0\src\raw_handle.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_window-0.14.0\src\system.rs C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_window-0.14.0\src\window.rs
+
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_window-0.14.0\src\lib.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_window-0.14.0\src\cursor.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_window-0.14.0\src\event.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_window-0.14.0\src\raw_handle.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_window-0.14.0\src\system.rs:
+C:\Users\Julien\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\bevy_window-0.14.0\src\window.rs:

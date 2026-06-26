@@ -1,5 +1,5 @@
 use ratatui::{
-    style::{Style, Stylize},
+    style::{Color, Style},
     widgets::{Block, ListState, Paragraph},
 };
 
@@ -74,15 +74,15 @@ pub trait OptionsList<const SIZE: usize> {
         cycle_add(self.current_index(), SIZE, -1);
     }
     fn paragraph(&mut self, i: usize) -> Paragraph {
-        let style = if i == *self.current_index() {
-            Style::new().bold()
+        let selected = i == *self.current_index();
+        let (fg, title_str) = if selected {
+            (Color::Yellow, format!("▶ {}", self.nth_title(i)))
         } else {
-            Style::new()
+            (Color::Reset, self.nth_title(i))
         };
-        Paragraph::new(self.nth(i).clone()).block(
-            Block::bordered()
-                .border_style(style)
-                .title_top(self.nth_title(i)),
-        )
+        let style = Style::new().fg(fg);
+        Paragraph::new(self.nth(i).clone())
+            .style(style)
+            .block(Block::bordered().border_style(style).title_top(title_str))
     }
 }

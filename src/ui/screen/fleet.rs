@@ -1,4 +1,4 @@
-use std::{error::Error, num::ParseFloatError};
+use std::{error::Error, num::ParseFloatError, path::PathBuf};
 
 use arrayvec::CapacityError;
 use bevy::prelude::*;
@@ -7,14 +7,24 @@ use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::{
     layout::{Alignment, Constraint, Layout},
     style::Stylize,
-    widgets::{Block, Clear, List, ListState, Paragraph, StatefulWidget, Widget},
+    widgets::{Block, Clear, List, ListState, Paragraph, StatefulWidget, Widget, Wrap},
 };
 
 use crate::{
-    objects::id::MAX_ID_LENGTH,
+    game::GameFiles,
+    objects::{
+        id::MAX_ID_LENGTH,
+        orbiting_obj::OrbitingObjects,
+        ships::{
+            config::{list_ship_configs, load_ship_config, ShipConfig},
+            trajectory::TrajectoryEvent,
+        },
+    },
+    physics::time::TimeEvent,
     prelude::*,
+    scripting::bridge::InjectComponentsEvent,
     ui::UiUpdate,
-    utils::{algebra::circular_orbit_around_body, list::OptionsList, ui::centered_rect},
+    utils::{algebra::circular_orbit_around_body, list::OptionsList},
 };
 
 pub fn plugin(app: &mut App) {
@@ -38,11 +48,51 @@ pub fn plugin(app: &mut App) {
                 )
                 .in_set(UiUpdate),
         )
-        .add_systems(OnEnter(InGame), create_screen)
+        .add_systems(OnEnter(InGame), (create_screen, create_fleet_space_map).chain())
         .add_systems(
             OnExit(InGame),
-            clear_screen.run_if(not(in_state(AppScreen::Fleet))),
+            (
+                clear_screen.run_if(not(in_state(AppScreen::Fleet))),
+                |mut commands: Commands| commands.remove_resource::<SpaceMap>(),
+            ),
+        )
+        .add_systems(
+            OnEnter(AppScreen::Fleet),
+            create_fleet_space_map.run_if(in_state(Loaded)),
+        )
+        .add_systems(
+            Update,
+            handle_fleet_focus
+                .run_if(in_loaded_screen::<FleetContext>(AppScreen::Fleet))
+                .run_if(on_event::<SelectObjectEvent>())
+                .run_if(resource_exists::<SpaceMap>),
         );
+}
+
+fn create_fleet_space_map(
+    mut commands: Commands,
+    system_size: Res<SystemSize>,
+    primary: Query<Entity, With<PrimaryBody>>,
+    bodies_mapping: Res<BodiesMapping>,
+    bodies: Query<(&BodyInfo, &OrbitingObjects)>,
+) {
+    let primary_entity = primary.get_single().ok();
+    let mut map = SpaceMap::new(system_size.0, primary_entity, primary_entity);
+    map.autoscale(&bodies_mapping.0, &bodies);
+    commands.insert_resource(map);
+}
+
+fn handle_fleet_focus(
+    mut events: EventReader<SelectObjectEvent>,
+    bodies: Query<&BodyInfo>,
+    mut space_map: ResMut<SpaceMap>,
+) {
+    for event in events.read() {
+        if bodies.get(event.entity).is_ok() {
+            space_map.focus(event.entity);
+            space_map.selected = Some(event.entity);
+        }
+    }
 }
 
 fn create_screen(
@@ -58,12 +108,45 @@ fn clear_screen(mut commands: Commands) {
     commands.remove_resource::<FleetContext>();
 }
 
+#[derive(Clone)]
+pub struct LoadShipContext {
+    configs: Vec<(String, PathBuf)>,
+    list_state: ListState,
+    error: Option<String>,
+}
+
+impl LoadShipContext {
+    fn new(dir: &std::path::Path) -> Self {
+        Self {
+            configs: list_ship_configs(dir),
+            list_state: ListState::default(),
+            error: None,
+        }
+    }
+    fn selected(&self) -> Option<&PathBuf> {
+        self.list_state.selected().map(|i| &self.configs[i].1)
+    }
+}
+
+impl ClampedList for LoadShipContext {
+    fn list_state(&mut self) -> &mut ListState { &mut self.list_state }
+    fn len(&self) -> usize { self.configs.len() }
+}
+
+#[derive(Clone)]
+pub enum FleetPopupKind {
+    CreateShip(CreateShipContext),
+    LoadShip(LoadShipContext),
+}
+
 #[derive(Resource, Default)]
 pub struct FleetContext {
     list_state: ListState,
     ships: Vec<ShipInfo>,
-    popup_context: Option<CreateShipContext>,
+    popup: Option<FleetPopupKind>,
     stage: GameStage,
+    game_time: f64,
+    time_running: bool,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -71,7 +154,9 @@ pub struct FleetContext {
 pub enum FleetScreenEvent {
     Select(Direction2),
     TryNewShip(CreateShipContext),
+    LoadShip(ShipConfig),
     EditTrajectory,
+    EditComponents,
     EnterExplorer,
     Back,
 }
@@ -218,6 +303,9 @@ impl FleetContext {
             ..Default::default()
         }
     }
+    pub fn has_popup(&self) -> bool {
+        self.popup.is_some()
+    }
     fn selected_ship(&self) -> Option<&ShipInfo> {
         self.list_state.selected().map(|i| &self.ships[i])
     }
@@ -225,11 +313,16 @@ impl FleetContext {
 
 pub struct FleetScreen;
 
+/// Renders only the popup, centered on the full window area.
+pub struct FleetPopup;
+
 fn read_input(
     mut context: ResMut<FleetContext>,
     mut key_event: EventReader<KeyEvent>,
     keymap: Res<Keymap>,
     mut internal_event: EventWriter<FleetScreenEvent>,
+    mut time_events: EventWriter<TimeEvent>,
+    game_files: Res<GameFiles>,
 ) {
     use Direction2::*;
     use FleetScreenEvent::*;
@@ -238,7 +331,7 @@ fn read_input(
         if event.kind == KeyEventKind::Release {
             return;
         }
-        match &mut context.popup_context {
+        match &mut context.popup {
             None => match event {
                 e if keymap.select_next.matches(e) => {
                     internal_event.send(Select(Down));
@@ -249,8 +342,20 @@ fn read_input(
                 e if keymap.edit_trajectory.matches(e) => {
                     internal_event.send(EditTrajectory);
                 }
+                e if keymap.run_time.matches(e) => {
+                    time_events.send(TimeEvent::StartTime);
+                }
+                e if keymap.pause_time.matches(e) => {
+                    time_events.send(TimeEvent::PauseTime);
+                }
                 e if keymap.new_ship.matches(e) => {
-                    context.popup_context = Some(CreateShipContext::default())
+                    context.popup = Some(FleetPopupKind::CreateShip(CreateShipContext::default()));
+                }
+                e if keymap.load_ship.matches(e) => {
+                    context.popup = Some(FleetPopupKind::LoadShip(LoadShipContext::new(&game_files.ships)));
+                }
+                e if keymap.edit_components.matches(e) => {
+                    internal_event.send(EditComponents);
                 }
                 e if keymap.back.matches(e) => {
                     internal_event.send(Back);
@@ -260,10 +365,10 @@ fn read_input(
                 }
                 _ => {}
             },
-            Some(ctx) => match event {
+            Some(FleetPopupKind::CreateShip(ctx)) => match event {
                 e if keymap.cycle_options.matches(e) => ctx.select_next(),
                 e if keymap.cycle_options_back.matches(e) => ctx.select_previous(),
-                e if keymap.back.matches(e) => context.popup_context = None,
+                e if keymap.back.matches(e) => context.popup = None,
                 e if keymap.validate_new_ship.matches(e) => {
                     internal_event.send(TryNewShip(ctx.clone()));
                 }
@@ -276,6 +381,24 @@ fn read_input(
                 } => ctx.selected_field().push(*c),
                 _ => {}
             },
+            Some(FleetPopupKind::LoadShip(ctx)) => match event {
+                e if keymap.select_next.matches(e) => ctx.select_adjacent(Down),
+                e if keymap.select_previous.matches(e) => ctx.select_adjacent(Up),
+                e if keymap.back.matches(e) => context.popup = None,
+                e if keymap.validate_new_ship.matches(e) => {
+                    if let Some(path) = ctx.selected().cloned() {
+                        match load_ship_config(&path) {
+                            Ok(config) => { internal_event.send(LoadShip(config)); }
+                            Err(e) => {
+                                if let Some(FleetPopupKind::LoadShip(ctx)) = &mut context.popup {
+                                    ctx.error = Some(format!("Erreur: {e}"));
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            },
         }
     }
 }
@@ -286,6 +409,8 @@ fn handle_fleet_events(
     mut next_mode: ResMut<NextState<ClientMode>>,
     mut events: EventReader<FleetScreenEvent>,
     mut ship_events: EventWriter<ShipEvent>,
+    mut trajectory_events: EventWriter<TrajectoryEvent>,
+    mut inject_events: EventWriter<InjectComponentsEvent>,
     bodies: Query<(&Mass, &Position, &Velocity)>,
     mapping: Res<BodiesMapping>,
 ) -> color_eyre::eyre::Result<()> {
@@ -296,7 +421,41 @@ fn handle_fleet_events(
                 let info = ctx.to_info(context.ships.iter(), &bodies, mapping.as_ref())?;
                 context.ships.push(info.clone());
                 ship_events.send(ShipEvent::Create(info.clone()));
-                context.popup_context = None;
+                context.popup = None;
+            }
+            FleetScreenEvent::LoadShip(config) => {
+                if let Some(id) = config.ship_id() {
+                    let info = ShipInfo {
+                        id,
+                        spawn_pos: config.spawn_pos.into(),
+                        spawn_speed: config.spawn_speed.into(),
+                    };
+                    if !context.ships.iter().any(|s| s.id == id) {
+                        context.ships.push(info.clone());
+                        ship_events.send(ShipEvent::Create(info));
+                        if !config.components.tanks.is_empty()
+                            || !config.components.thrusters.is_empty()
+                            || !config.components.sensors.is_empty()
+                        {
+                            inject_events.send(InjectComponentsEvent {
+                                ship_id: id,
+                                components: config.components.clone(),
+                            });
+                        }
+                        if !config.trajectory.nodes.is_empty() {
+                            trajectory_events.send(TrajectoryEvent::Create {
+                                ship: id,
+                                trajectory: config.trajectory.clone(),
+                            });
+                        }
+                    }
+                    context.popup = None;
+                }
+            }
+            FleetScreenEvent::EditComponents => {
+                if let Some(ship) = context.selected_ship() {
+                    next_screen.set(AppScreen::Components(ship.id));
+                }
             }
             FleetScreenEvent::EditTrajectory => {
                 if let Some(ship) = context.selected_ship() {
@@ -313,9 +472,13 @@ fn handle_fleet_events(
 fn update_fleet_context(
     stage: Res<State<GameStage>>,
     ships: Query<&ShipInfo>,
+    time: Res<GameTime>,
+    toggle_time: Res<ToggleTime>,
     mut ctx: ResMut<FleetContext>,
 ) {
     ctx.stage = stage.get().clone();
+    ctx.game_time = time.time();
+    ctx.time_running = toggle_time.0;
     ctx.ships.retain(|i| ships.iter().any(|j| i == j));
     let diff = ships
         .iter()
@@ -329,10 +492,18 @@ impl StatefulWidget for FleetScreen {
 
     fn render(
         self,
-        area: ratatui::prelude::Rect,
+        _full_area: ratatui::prelude::Rect,
         buf: &mut ratatui::prelude::Buffer,
         state: &mut Self::State,
     ) {
+        use crate::ui::tui_overlay::{TUI_COLS, TUI_ROWS};
+        let area = ratatui::prelude::Rect {
+            x: 0,
+            y: 0,
+            width: TUI_COLS,
+            height: TUI_ROWS,
+        };
+
         let chunks =
             Layout::horizontal([Constraint::Percentage(50), Constraint::Fill(1)]).split(area);
 
@@ -340,52 +511,127 @@ impl StatefulWidget for FleetScreen {
         let entries = state.ships.iter().map(|s| s.id.to_string());
         let list = List::new(entries).highlight_symbol(">").block(
             Block::bordered()
-                .title_top("Ships")
-                .title_bottom(format!("Current stage: {}", state.stage)),
+                .title_top(format!(
+                    "Fleet — Stage: {}  ·  Time: {:.3} d ({})",
+                    state.stage,
+                    state.game_time,
+                    if state.time_running { "Running" } else { "Paused" }
+                ))
+                .title_bottom("Ships"),
         );
         <List as StatefulWidget>::render(list, chunks[0], buf, &mut state.list_state);
 
-        // Ship info
+        // Ship info or help panel
         if let Some(info) = state.selected_ship() {
             Paragraph::new(format!(
-                "ID: {}\nSpawn position: {}\nSpawn velocity: {}",
-                info.id, info.spawn_pos, info.spawn_speed
+                "ID: {}\nSpawn position: {}\nSpawn velocity: {}\n\nspace: edit traj  c: components  n: new  l: load  e: explorer  r: run  p: pause  esc: back",
+                info.id,
+                info.spawn_pos,
+                info.spawn_speed
             ))
             .block(Block::bordered().title_top("Ship info"))
+            .wrap(Wrap { trim: true })
+            .render(chunks[1], buf);
+        } else {
+            Paragraph::new(
+                "No ship selected. Use Up/Down to choose a ship.\n\nn: new ship  l: load ship  e: explorer  r: run  p: pause  esc: back",
+            )
+            .block(Block::bordered().title_top("Fleet help"))
+            .wrap(Wrap { trim: true })
             .render(chunks[1], buf);
         }
+    }
+}
 
-        // Ship creation popup
-        if let Some(ctx) = &mut state.popup_context {
-            let popup = centered_rect(60, 60, area);
-            Clear.render(popup, buf);
-            let chunks =
-                Layout::vertical([Constraint::Length(3), Constraint::Fill(1)]).split(popup);
+impl StatefulWidget for FleetPopup {
+    type State = FleetContext;
 
-            // Title
-            Paragraph::new("Create ship".bold())
-                .alignment(Alignment::Center)
-                .render(chunks[0], buf);
-
-            let body = Layout::horizontal([Constraint::Percentage(50), Constraint::Fill(1)])
-                .split(chunks[1]);
-
-            // Left side of options
-            let mut constraints = [Constraint::Percentage(100 / 3)].repeat(3);
-            constraints.push(Constraint::Fill(1));
-            let left = Layout::vertical(constraints).split(body[0]);
-            for i in 0..3 {
-                ctx.paragraph(i).render(left[i], buf);
-            }
-
-            // Right side (spawn coordinates)
-            let mut constraints = [Constraint::Percentage(100 / 6)].repeat(6);
-            constraints.push(Constraint::Fill(1));
-            let coords = Layout::vertical(constraints).split(body[1]);
-            for i in 3..9 {
-                ctx.paragraph(i).render(coords[i - 3], buf);
-            }
+    fn render(
+        self,
+        area: ratatui::prelude::Rect,
+        buf: &mut ratatui::prelude::Buffer,
+        state: &mut Self::State,
+    ) {
+        match &mut state.popup {
+            Some(FleetPopupKind::CreateShip(ctx)) => render_create_ship(ctx, area, buf),
+            Some(FleetPopupKind::LoadShip(ctx)) => render_load_ship(ctx, area, buf),
+            None => {}
         }
+    }
+}
+
+fn render_create_ship(ctx: &mut CreateShipContext, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
+    Clear.render(area, buf);
+    let block = Block::bordered().title_top(" Ship creation ".bold());
+    let inner = block.inner(area);
+    block.render(area, buf);
+
+    let chunks = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Length(2),
+        Constraint::Fill(1),
+    ])
+    .split(inner);
+
+    Paragraph::new("Esc: cancel  ·  Tab: next field  ·  Shift+Tab: prev  ·  Enter: validate")
+        .alignment(Alignment::Center)
+        .wrap(Wrap { trim: true })
+        .render(chunks[0], buf);
+
+    Paragraph::new("Fill host body + altitude for orbit, or all six coords for free spawn.")
+        .alignment(Alignment::Center)
+        .wrap(Wrap { trim: true })
+        .render(chunks[1], buf);
+
+    let body =
+        Layout::horizontal([Constraint::Percentage(50), Constraint::Fill(1)]).split(chunks[2]);
+
+    let mut lc = [Constraint::Percentage(100 / 3)].repeat(3);
+    lc.push(Constraint::Fill(1));
+    let left = Layout::vertical(lc).split(body[0]);
+    for i in 0..3 {
+        ctx.paragraph(i).render(left[i], buf);
+    }
+
+    let mut rc = [Constraint::Percentage(100 / 6)].repeat(6);
+    rc.push(Constraint::Fill(1));
+    let coords = Layout::vertical(rc).split(body[1]);
+    for i in 3..9 {
+        ctx.paragraph(i).render(coords[i - 3], buf);
+    }
+}
+
+fn render_load_ship(ctx: &mut LoadShipContext, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
+    Clear.render(area, buf);
+    let block = Block::bordered().title_top(" Load ship ".bold());
+    let inner = block.inner(area);
+    block.render(area, buf);
+
+    let chunks = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Fill(1),
+        Constraint::Length(1),
+    ])
+    .split(inner);
+
+    Paragraph::new("Up/Down: select  ·  Enter: load  ·  Esc: cancel")
+        .alignment(Alignment::Center)
+        .render(chunks[0], buf);
+
+    if ctx.configs.is_empty() {
+        Paragraph::new("No saved ships found in gamefiles/ships/")
+            .alignment(Alignment::Center)
+            .render(chunks[1], buf);
+    } else {
+        let items: Vec<String> = ctx.configs.iter().map(|(name, _)| name.clone()).collect();
+        let list = List::new(items).highlight_symbol("> ");
+        <List as StatefulWidget>::render(list, chunks[1], buf, &mut ctx.list_state);
+    }
+
+    if let Some(err) = &ctx.error {
+        Paragraph::new(err.as_str())
+            .alignment(Alignment::Center)
+            .render(chunks[2], buf);
     }
 }
 

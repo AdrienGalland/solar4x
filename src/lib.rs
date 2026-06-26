@@ -5,6 +5,7 @@ pub mod network;
 pub mod objects;
 pub mod physics;
 pub mod prelude;
+pub mod scripting;
 pub mod server;
 pub mod ui;
 pub mod utils;
