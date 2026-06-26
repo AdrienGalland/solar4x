@@ -66,7 +66,7 @@ Key Bevy states:
 - `InGame` (computed from `ClientMode + Loaded`) — true in singleplayer or multiplayer when loaded
 - `GameStage` (Preparation / Action, sub-state of `InGame`) — time is paused in Preparation, running in Action
 - `Authoritative` (computed) — true when the instance owns simulation (singleplayer or server)
-- `AppScreen` (StartMenu / Explorer / Fleet / Editor(ShipID) / Scheduler(ShipID)) — which TUI screen is shown
+- `AppScreen` (StartMenu / Explorer / Fleet / Editor(ShipID) / Scheduler(ShipID) / Components(ShipID)) — which TUI screen is shown
 
 ### Physics pipeline (FixedUpdate, gated by `ToggleTime`)
 
@@ -84,7 +84,7 @@ Time is measured in **simulation ticks** (`GameTime.simtick`). `GAMETIME_PER_SIM
 ### Objects
 
 - **Bodies** (`src/objects/bodies/`): loaded from `main_objects.json` (or a custom JSON), filtered by `BodiesConfig` (by `BodyType` threshold or explicit IDs). The `PrimaryBody` marker identifies the star.
-- **Ships** (`src/objects/ships.rs`): spawned via `ShipEvent::Create`. Free-motion ships carry `Influenced + Acceleration + Velocity`. Ships with negative specific orbital energy can optionally switch to `EllipticalOrbit` (orbital mode), losing `Influenced`/`Acceleration`. Trajectories (sequences of `ManeuverNode`) are serialised to `gamefiles/trajectories/<ship_id>.json`.
+- **Ships** (`src/objects/ships.rs`): spawned via `ShipEvent::Create`. Free-motion ships carry `Influenced + Acceleration + Velocity`. Ships with negative specific orbital energy can optionally switch to `EllipticalOrbit` (orbital mode), losing `Influenced`/`Acceleration`. Trajectories (sequences of `ManeuverNode`) are serialised to `gamefiles/trajectories/<ship_id>` (TOML format, no extension).
 - **Predictions** (`src/physics/predictions.rs`): computed on the client to draw trajectory previews in the GUI.
 
 ### Lua scripting (`src/scripting.rs`)
@@ -118,11 +118,12 @@ System ordering within `Update`: `FireEvents → ProcessEvents → BridgeEvents`
 **Event scripts** are loaded once from `src/scripts/events/` on `OnEnter(Loaded)`. Each `.lua` file in that directory is executed immediately (registering `on(...)` handlers); the handlers then run as coroutines each time the matching event fires.
 
 **Built-in events (fired by `BridgePlugin`):**
-- `ship_tick` — fired once per ship per frame while the simulation is running; data: `{ ship_id: string, distances: { body_id → number } }`
+- `ship_tick` — fired once per ship per frame while the simulation is running; data: `{ ship_id: string, bodies: { body_id → number }, ships: { ship_id → number } }`
 
 **Events handled by `BridgePlugin` (fire from Lua to control the game):**
 - `pause_game` — sends `TimeEvent::PauseTime`
 - `resume_game` — sends `TimeEvent::StartTime`
+- `apply_thrust` — sends `VelocityUpdate`; data: `{ ship_id: string, dx: number, dy: number, dz: number }` (km/jour)
 
 ### UI layers
 

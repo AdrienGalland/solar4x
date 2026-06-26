@@ -145,6 +145,14 @@ declare_components("shp", {
 })
 ```
 
+#### `get_max_sensor_range(ship_id)` → `number`
+
+Retourne la portée maximale parmi tous les capteurs du vaisseau (0 si aucun capteur déclaré).
+
+```lua
+local portee_max = get_max_sensor_range("shp")
+```
+
 #### `get_fuel(ship_id, tank_id)` → `number`
 
 Retourne le carburant restant dans un réservoir (0 si inconnu).
@@ -391,6 +399,7 @@ end)
 | Fonction | Retour | Description |
 |---|---|---|
 | `declare_components(ship_id, config)` | — | Initialise les composants d'un vaisseau |
+| `get_max_sensor_range(ship_id)` | `number` | Portée maximale parmi tous les capteurs |
 | `get_fuel(ship_id, tank_id)` | `number` | Carburant restant en litres |
 | `empty_tank(ship_id, tank_id, volume)` | `bool` | Vide un réservoir, retourne faux si insuffisant |
 | `use_thruster(ship_id, thruster_id, power, dir)` | `bool` | Pousse + consomme carburant |
